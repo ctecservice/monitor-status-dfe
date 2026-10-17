@@ -1,5 +1,5 @@
 # Dependencias do projeto (pip + venv). Pins exatos.
-Flask==3.1.1
+Flask==3.1.3
 APScheduler==3.11.0
 httpx==0.28.1
 python-dotenv==1.1.1
