@@ -101,6 +101,7 @@ Pastas novas devem seguir essa separação por responsabilidade.
 - **Caminho simples (sem nginx):** `python src/app.py` — sobe em `0.0.0.0` na porta de `web.porta` (padrão 5628).
 - **Caminho avançado (opcional):** gunicorn com **1 worker** via `wsgi:app` (o scheduler roda no processo; mais de um worker duplicaria coletas), atrás de nginx.
 - **Container:** há `Dockerfile`; monte volumes em `data/` e `logs/`.
+- **Verificação:** `python -m pytest tests -q` (rotas/regras via test_client) e `python src/scripts/verificar.py` (smoke HTTP em servidor real, porta efêmera, encerra sozinho).
 
 ## Open-source (decisões v2)
 
