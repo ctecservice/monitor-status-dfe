@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Configuração — Monitor Status DFe</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="topbar" role="banner">
+    <div class="topbar__inner">
+      <a class="topbar__brand" href="/">
+        <span class="topbar__brand-mark" aria-hidden="true"></span>
+        <span>Monitor Status DFe</span>
+      </a>
+      {% if autenticado %}
+      <nav class="topbar__nav" aria-label="Sessão">
+        <form id="form-logout" method="post" action="{{ url_for('config_logout') }}">
+          <button class="topbar__link" type="submit">Sair</button>
+        </form>
+      </nav>
+      {% endif %}
+    </div>
+  </header>
+
+  <main>
+    {% if not autenticado %}
+    <section class="auth" aria-labelledby="auth-titulo">
+      <div class="auth__card">
+        <h1 class="auth__title" id="auth-titulo">Acessar painel</h1>
+        <p class="auth__desc">Entre com a senha do administrador para ajustar as configurações do monitor.</p>
+        {% if erro %}
+        <div class="alert alert--error" role="alert">{{ erro }}</div>
+        {% endif %}
+        {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+        <div class="alert alert--{{ 'success' if categoria == 'sucesso' else 'error' }}" role="alert">{{ mensagem }}</div>
+        {% endfor %}
+        <form method="post" action="{{ url_for('config_login') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+          <div class="field">
+            <label class="field__label" for="senha">Senha</label>
+            <input class="field__input" type="password" id="senha" name="senha"
+                   autocomplete="current-password" required autofocus>
+          </div>
+          <button class="btn btn--primary btn--block" type="submit">Entrar</button>
+        </form>
+      </div>
+    </section>
+    {% else %}
+    <div class="container">
+      <header class="panel__header">
+        <h1 class="panel__title">Configurações operacionais</h1>
+        <p class="panel__desc">Filtros aplicados ao ciclo de coleta e à retenção de dados.</p>
+      </header>
+
+      {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+      <div class="alert alert--{{ 'success' if categoria == 'sucesso' else 'error' }}" role="alert">{{ mensagem }}</div>
+      {% endfor %}
+
+      <form method="post" action="{{ url_for('config_salvar') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <section class="card" aria-labelledby="card-coleta">
+          <div class="card__header">
+            <h2 class="card__title" id="card-coleta">Coleta</h2>
+            <p class="card__subtitle">O que o monitor consulta e com que frequência.</p>
+          </div>
+          <div class="panel__grid">
+            <div class="field">
+              <label class="field__label" for="ufs_monitoradas">UFs monitoradas</label>
+              <input class="field__input field__input--mono" type="text" id="ufs_monitoradas" name="ufs_monitoradas"
+                     value="{{ filtros.ufs_monitoradas }}" placeholder="MG,SP,RJ" autocomplete="off">
+              <p class="field__hint">Siglas separadas por vírgula. Vazio significa todas as UFs.</p>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="modelos_ativos">Modelos ativos</label>
+              <input class="field__input field__input--mono" type="text" id="modelos_ativos" name="modelos_ativos"
+                     value="{{ filtros.modelos_ativos }}" placeholder="nfe" autocomplete="off">
+              <p class="field__hint">Códigos separados por vírgula. Vazio significa todos os modelos ativos.</p>
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="intervalo_min">Intervalo entre coletas (minutos)</label>
+              <input class="field__input" type="number" id="intervalo_min" name="intervalo_min" min="1"
+                     value="{{ filtros.intervalo_min }}">
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="timeout_s">Timeout da API (segundos)</label>
+              <input class="field__input" type="number" id="timeout_s" name="timeout_s" min="1"
+                     value="{{ filtros.timeout_s }}">
+            </div>
+          </div>
+        </section>
+
+        <section class="card" aria-labelledby="card-retencao">
+          <div class="card__header">
+            <h2 class="card__title" id="card-retencao">Retenção</h2>
+            <p class="card__subtitle">Por quanto tempo manter dados e logs.</p>
+          </div>
+          <div class="panel__grid">
+            <div class="field">
+              <label class="field__label" for="retencao_dados_dias">Retenção de dados (dias)</label>
+              <input class="field__input" type="number" id="retencao_dados_dias" name="retencao_dados_dias" min="1"
+                     value="{{ filtros.retencao_dados_dias }}">
+            </div>
+
+            <div class="field">
+              <label class="field__label" for="retencao_logs_dias">Retenção de logs (dias)</label>
+              <input class="field__input" type="number" id="retencao_logs_dias" name="retencao_logs_dias" min="1"
+                     value="{{ filtros.retencao_logs_dias }}">
+            </div>
+          </div>
+        </section>
+
+        <div class="panel__actions">
+          <button class="btn btn--ghost" type="submit" form="form-logout">Sair</button>
+          <button class="btn btn--primary" type="submit">Salvar alterações</button>
+        </div>
+      </form>
+    </div>
+    {% endif %}
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="footer__inner">
+      <span>Monitor Status DFe — DadosJah</span>
+      <span><a href="/">Início</a></span>
+    </div>
+  </footer>
+</body>
+</html>

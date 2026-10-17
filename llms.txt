@@ -1,0 +1,54 @@
+# llms.txt - Monitor Status DFe
+
+Monitor open-source do status dos servicos SEFAZ (DF-e), alimentado pela API
+DadosJah. Coleta periodica, classifica o cStat e exibe um painel com grade
+semaforo e historico.
+
+## Visao Geral
+
+- O que faz: monitora o status dos servicos SEFAZ (portal nacional DF-e) por UF,
+  modelo de documento e ambiente (producao/homologacao).
+- Stack: Python 3.12 + Flask + SQLite (WAL) + APScheduler + Jinja2 + HTML/CSS/JS
+  vanilla (sem build tools).
+
+## Como funciona
+
+1. Coleta periodica: um job consulta a API DadosJah por UF x modelo x ambiente,
+   autenticando com login (email/senha) e usando o access token JWT.
+2. Classificacao: o cStat da SEFAZ vira um estado (107 operacional, 108 instavel,
+   109 indisponivel; erro/timeout = sem dados).
+3. Exibicao: grade semaforo no painel e historico persistido em SQLite para
+   uptime e latencia.
+
+## Rotas HTTP
+
+| Rota | Tipo | Descricao |
+|---|---|---|
+| / | pagina | Painel com grade UF x modelo |
+| /uf/<uf> | pagina | Detalhe por UF (ultimo status, uptime, latencia) |
+| /api/status | JSON | Estado atual das celulas (polling 60 s) |
+| /api/uf/<uf>/historico | JSON | Serie historica (uptime + sparkline) |
+| /health | JSON | Saude do monitor |
+| /config | pagina | Configuracao (protegida por senha) |
+| /termos | pagina | Termos de uso |
+| /llms.txt | texto | Este guia para agentes de IA |
+| /robots.txt | texto | Politica de crawlers |
+| /sitemap.xml | XML | Paginas estaticas do site |
+
+## Execucao
+
+1. Execute criar-venv.bat para criar o ambiente virtual.
+2. Copie .env.example para .env.
+3. Preencha API_LOGIN_USUARIO e API_LOGIN_SENHA no .env.
+4. Rode src/scripts/configurar.py (gera a master key e a senha do admin).
+5. Inicie com: python src/app.py
+
+## Documentacao
+
+- README: public/docs/README.md
+- Uso: public/docs/uso.md
+- Configuracao: public/docs/configuracao.md
+- API: public/docs/api.md
+- Arquitetura: public/docs/arquitetura.md
+- Deploy: public/docs/deploy.md
+- Como executar: public/docs/como-executar.md

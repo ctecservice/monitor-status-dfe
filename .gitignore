@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+build/
+dist/
+*.egg-info/
+
+# Ambientes virtuais
+.venv/
+venv/
+env/
+
+# Dados e logs gerados em tempo de execucao
+logs/
+data/
+*.log
+
+# Documentacao interna (NAO versionar)
+# Docs publicas ficam em public/docs (versionada)
+/docs/
+
+# Configuracao local (nunca versionar)
+.env
+.env.local
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# ---- Arquivos relacionados a IA (NAO versionar) ----
+# Obs.: AGENTS.md E versionado de proposito (padrao do projeto).
+CLAUDE.md
+.claude/
+.opencode/
+.cursor/
+.agents/
+.aider*
+.copilot/
+.gemini/
+*.prompt.md

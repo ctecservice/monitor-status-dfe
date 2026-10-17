@@ -1,0 +1,7 @@
+# robots.txt - Monitor Status DFe
+# Permite a indexacao de todas as paginas publicas do site.
+
+User-agent: *
+Allow: /
+Allow: /llms.txt
+Allow: /robots.txt

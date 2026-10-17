@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Painel de status — Monitor Status DFe</title>
+  <link rel="icon" href="{{ url_for('static', filename='logos/simbolo.ico') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="topbar" role="banner">
+    <div class="topbar__inner">
+      <a class="topbar__brand" href="{{ url_for('index') }}">
+        <img class="topbar__logo"
+             src="{{ url_for('static', filename='logos/simbolo-400x400.png') }}"
+             alt="" width="28" height="28">
+        <span>Monitor Status DFe</span>
+      </a>
+      <nav class="topbar__nav" aria-label="Navegação principal">
+        <a class="topbar__link" href="{{ url_for('index') }}">Painel</a>
+        <a class="topbar__link" href="{{ url_for('config_pagina') }}">Configurações</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container container--wide">
+      <header class="panel__header">
+        <div class="panel__header-row">
+          <div>
+            <h1 class="panel__title">Painel de status</h1>
+            <p class="panel__desc">
+              Monitor dos serviços SEFAZ. Atualizado a cada 60 segundos.
+              <span class="panel__meta">Gerado em
+                <time id="gerado-em" datetime="{{ gerado_em }}">{{ gerado_em }}</time>
+              </span>
+            </p>
+          </div>
+
+          <div class="ambiente-toggle" role="tablist" aria-label="Seleção de ambiente">
+            {% for amb in ambientes %}
+            <button class="ambiente-toggle__btn"
+                    type="button"
+                    role="tab"
+                    data-tp-amb="{{ amb.tp_amb }}"
+                    aria-selected="{{ 'true' if amb.tp_amb == 1 else 'false' }}">
+              {{ amb.rotulo }}
+            </button>
+            {% endfor %}
+          </div>
+        </div>
+
+        <div class="legenda" aria-label="Legenda de estados">
+          <span class="legenda__item">
+            <span class="legenda__dot" style="background:#22C55E"></span>
+            <span class="legenda__label">Operacional</span>
+          </span>
+          <span class="legenda__item">
+            <span class="legenda__dot" style="background:#F59E0B"></span>
+            <span class="legenda__label">Instável</span>
+          </span>
+          <span class="legenda__item">
+            <span class="legenda__dot" style="background:#EF4444"></span>
+            <span class="legenda__label">Indisponível</span>
+          </span>
+          <span class="legenda__item">
+            <span class="legenda__dot" style="background:#8A8585"></span>
+            <span class="legenda__label">Sem dados</span>
+          </span>
+        </div>
+      </header>
+
+      <div id="alerta-painel" class="alert alert--warn" hidden role="status"></div>
+
+      <div class="grade" id="grade">
+        <div class="grade__scroll">
+          <table class="grade__table">
+            <thead>
+              <tr>
+                <th class="grade__th--sticky" scope="col">UF</th>
+                {% for m in modelos %}
+                <th scope="col">{{ m.nome }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for uf in ufs %}
+              <tr>
+                <th class="grade__th--sticky" scope="row">
+                  <a class="grade__uf-link" href="{{ url_for('uf_detalhe', uf=uf) }}">{{ uf }}</a>
+                </th>
+                {% for m in modelos %}
+                {% set cells = celulas | selectattr('uf', 'equalto', uf) | selectattr('documento', 'equalto', m.codigo) | list %}
+                {% set c1 = cells | selectattr('tp_amb', 'equalto', 1) | list | first %}
+                {% set c2 = cells | selectattr('tp_amb', 'equalto', 2) | list | first %}
+                <td class="grade__td" data-uf="{{ uf }}" data-documento="{{ m.codigo }}">
+                  <a class="celula{% if c1 %} celula--preenchida{% endif %}"
+                     data-tp-amb="1"
+                     data-uf="{{ uf }}"
+                     data-documento="{{ m.codigo }}"
+                     href="{{ url_for('uf_detalhe', uf=uf) }}?documento={{ m.codigo }}&tp_amb=1"
+                     style="{% if c1 %}--celula-cor:{{ c1.cor }};{% endif %}"
+                     title="{{ c1.estado if c1 else 'Sem dados' }}{% if c1 and c1.t_med is not none %} · {{ c1.t_med }} ms{% endif %}">
+                    <span class="celula__estado">{{ c1.estado if c1 else 'Sem dados' }}</span>
+                    <span class="celula__latencia">{{ c1.t_med if c1 and c1.t_med is not none else '—' }}</span>
+                    {% if c1 and c1.cstat %}
+                    <span class="celula__cstat">{{ c1.cstat }}</span>
+                    {% endif %}
+                  </a>
+                  <a class="celula{% if c2 %} celula--preenchida{% endif %} celula--oculta"
+                     data-tp-amb="2"
+                     data-uf="{{ uf }}"
+                     data-documento="{{ m.codigo }}"
+                     href="{{ url_for('uf_detalhe', uf=uf) }}?documento={{ m.codigo }}&tp_amb=2"
+                     style="{% if c2 %}--celula-cor:{{ c2.cor }};{% endif %}"
+                     title="{{ c2.estado if c2 else 'Sem dados' }}{% if c2 and c2.t_med is not none %} · {{ c2.t_med }} ms{% endif %}">
+                    <span class="celula__estado">{{ c2.estado if c2 else 'Sem dados' }}</span>
+                    <span class="celula__latencia">{{ c2.t_med if c2 and c2.t_med is not none else '—' }}</span>
+                    {% if c2 and c2.cstat %}
+                    <span class="celula__cstat">{{ c2.cstat }}</span>
+                    {% endif %}
+                  </a>
+                </td>
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <p class="panel__nota">
+        <strong>Sem dados</strong> significa que a fonte não respondeu (API, rede ou certificado).
+        <strong>Indisponível</strong> indica que o serviço SEFAZ está fora do ar (cStat 109).
+      </p>
+    </div>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="footer__inner">
+      <span class="footer__texto">Monitor Status DFe · DadosJah</span>
+      <a class="footer__logo-link" href="https://dadosjah.com.br" target="_blank" rel="noopener">
+        <img class="footer__logo"
+             src="{{ url_for('static', filename='logos/logo-horizontal-escuro-2400x800.png') }}"
+             alt="DadosJah" height="28">
+      </a>
+    </div>
+  </footer>
+
+  <script>
+    // Dados iniciais injetados pelo Jinja (consumidos por app.js)
+    window.__INITIAL_DATA__ = {
+      celulas: {{ celulas|tojson }},
+      gerado_em: {{ gerado_em|tojson }}
+    };
+  </script>
+  <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
+</body>
+</html>
