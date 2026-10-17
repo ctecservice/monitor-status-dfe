@@ -1,0 +1,24 @@
+{
+  "_comentario": "Template de config.json. Copie para config.json e ajuste os valores. 'coleta': UFs e modelos monitorados (lista separada por vírgula; vazio = todos), intervalo entre ciclos em minutos, timeout das requisições em segundos e motor de coleta. 'retencao': dias de retenção do histórico de leituras e dos arquivos de log. 'web': porta HTTP da aplicação. 'rate_limit': limite de requisições por minuto na API pública. 'links': URLs exibidas nas páginas. Alterações exigem restart do processo.",
+  "coleta": {
+    "ufs_monitoradas": "AC,AL,AP,AM,BA,CE,DF,ES,GO,MA,MT,MS,MG,PA,PB,PR,PE,PI,RJ,RN,RS,RO,RR,SC,SP,SE,TO",
+    "modelos_ativos": "nfe",
+    "intervalo_min": 5,
+    "timeout_s": 20,
+    "motor": "dadosjah"
+  },
+  "retencao": {
+    "dados_dias": 30,
+    "logs_dias": 7
+  },
+  "web": {
+    "porta": 5628
+  },
+  "rate_limit": {
+    "api_requisicoes_por_minuto": 30
+  },
+  "links": {
+    "github": "https://github.com/ctecservice/monitor-status-dfe",
+    "ctec": "https://ctec.com.br/"
+  }
+}

@@ -1,0 +1,26 @@
+$kind: http-example
+name: Banco com erro ou scheduler inativo.
+request:
+  url: "{{baseUrl}}/health"
+  method: GET
+  headers:
+    Accept: application/json
+  body:
+    type: text
+    content: ""
+response:
+  statusCode: 503
+  statusText: Service Unavailable
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "status": "erro",
+        "banco": "ok",
+        "scheduler": "inativo",
+        "ultima_coleta": null,
+        "leituras_total": 0
+      }
+order: 2000

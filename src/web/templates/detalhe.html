@@ -8,8 +8,12 @@
   <title>{{ uf }} — {{ modelo_nome }} — Monitor Status DFe</title>
   <link rel="icon" href="{{ url_for('static', filename='logos/simbolo.ico') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% if turnstile_site_key %}
+  <meta name="turnstile-site-key" content="{{ turnstile_site_key }}">
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
+  {% endif %}
 </head>
-<body>
+<body data-uf="{{ uf }}">
   <header class="topbar" role="banner">
     <div class="topbar__inner">
       <a class="topbar__brand" href="{{ url_for('index') }}">
@@ -20,7 +24,8 @@
       </a>
       <nav class="topbar__nav" aria-label="Navegação principal">
         <a class="topbar__link" href="{{ url_for('index') }}">Painel</a>
-        <a class="topbar__link" href="{{ url_for('config_pagina') }}">Configurações</a>
+        <a class="topbar__link" href="{{ url_for('faq') }}">FAQ</a>
+        <a class="topbar__link" href="https://github.com/ctecservice/monitor-status-dfe" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </div>
   </header>
@@ -31,6 +36,7 @@
 
       <header class="detalhe__header">
         <div>
+          <span class="detalhe__eyebrow">UF</span>
           <h1 class="detalhe__uf">{{ uf }}</h1>
           <p class="detalhe__sub">{{ modelo_nome }} · <span id="detalhe-ambiente-rotulo">{{ ambiente_rotulo }}</span></p>
         </div>
@@ -61,7 +67,7 @@
               <dd>
                 <span class="badge" id="badge-estado"
                       style="background: {{ ultimo.cor if ultimo else '#8A8585' }};">
-                  {{ ultimo.estado if ultimo else 'Sem dados' }}
+                  {{ ultimo.rotulo if ultimo else 'Sem dados' }}
                 </span>
               </dd>
             </div>
@@ -105,11 +111,19 @@
           </div>
           <div class="uptime">
             <div class="uptime__bar">
+              {% if pontos %}
               <div class="uptime__fill" id="uptime-fill"
-                   style="width: {{ uptime_pct }}%; background: var(--ok);"></div>
+                   style="width: {{ uptime_pct }}%;"></div>
+              {% else %}
+              <div class="uptime__fill" id="uptime-fill" style="width: 0%;"></div>
+              {% endif %}
             </div>
             <div class="uptime__valor">
+              {% if pontos %}
               <strong id="uptime-pct">{{ '%.1f' % uptime_pct }}</strong><span>%</span>
+              {% else %}
+              <strong id="uptime-pct">—</strong>
+              {% endif %}
             </div>
           </div>
         </section>
@@ -120,7 +134,10 @@
           <div class="card__header-row">
             <div>
               <h2 class="card__title" id="card-historico">Latência — últimas 24 h</h2>
-              <p class="card__subtitle">Cada ponto é uma coleta. Passe o mouse para ver o detalhe.</p>
+              <p class="card__subtitle">
+                Cada ponto é uma coleta, posicionado na faixa de SLA correspondente.
+                Passe o mouse para ver o detalhe.
+              </p>
             </div>
             <div class="sparkline-legenda">
               <span class="sparkline-legenda__item" style="--dot:#22C55E">Operacional</span>
@@ -156,7 +173,10 @@
 
   <footer class="footer" role="contentinfo">
     <div class="footer__inner">
-      <span class="footer__texto">Monitor Status DFe · DadosJah</span>
+      <div class="footer__info">
+        <span class="footer__texto">Monitor Status DFe · DadosJah</span>
+        <span class="footer__creditos">Projeto open-source (MIT) · Desenvolvido e mantido pela <a class="footer__link" href="https://ctec.com.br/" target="_blank" rel="noopener">CTEC</a></span>
+      </div>
       <a class="footer__logo-link" href="https://dadosjah.com.br" target="_blank" rel="noopener">
         <img class="footer__logo"
              src="{{ url_for('static', filename='logos/logo-horizontal-escuro-2400x800.png') }}"
@@ -165,19 +185,6 @@
     </div>
   </footer>
 
-  <script>
-    window.__DETALHE_DATA__ = {
-      uf: {{ uf|tojson }},
-      documento: {{ documento|tojson }},
-      tp_amb: {{ tp_amb }},
-      ambiente_rotulo: {{ ambiente_rotulo|tojson }},
-      pontos: {{ pontos|tojson }},
-      uptime_pct: {{ uptime_pct }},
-      ultimo: {{ ultimo|tojson if ultimo else 'null' }},
-      ambientes: {{ ambientes|tojson }},
-      documentos: {{ documentos|tojson }}
-    };
-  </script>
   <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </body>
 </html>

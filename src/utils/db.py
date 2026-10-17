@@ -2,7 +2,6 @@ import logging
 import sqlite3
 import sys
 from contextlib import contextmanager
-from datetime import datetime, timezone
 from pathlib import Path
 
 # Permite executar o modulo de qualquer pasta: coloca a raiz do projeto no sys.path
@@ -12,9 +11,9 @@ from src.utils.settings import RAIZ_PROJETO, Settings, carregar_env
 
 logger = logging.getLogger("db")
 
-# DDL do banco: leituras (historico), modelos_dfe (extensivel por dados),
-# configuracoes (filtros operacionais da instancia) e segredos (credenciais
-# criptografadas em repouso).
+# DDL do banco: leituras (historico), modelos_dfe (extensivel por dados) e
+# segredos (credenciais criptografadas em repouso). Configuracoes operacionais
+# vivem em config.json, na raiz do projeto.
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS leituras (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -42,28 +41,12 @@ CREATE TABLE IF NOT EXISTS modelos_dfe (
   ativo    INTEGER NOT NULL DEFAULT 1
 );
 
-CREATE TABLE IF NOT EXISTS configuracoes (
-  chave         TEXT PRIMARY KEY,
-  valor         TEXT NOT NULL,
-  atualizado_em TEXT NOT NULL
-);
-
 CREATE TABLE IF NOT EXISTS segredos (
   chave         TEXT PRIMARY KEY,
   payload       TEXT NOT NULL,
   atualizado_em TEXT NOT NULL
 );
 """
-
-# Valores padrao das configuracoes operacionais (secao 3.3 do plano).
-_PADROES_CONFIG = {
-    "ufs_monitoradas": "",      # vazio = todas as UFs
-    "modelos_ativos": "",       # vazio = todos os modelos ativos
-    "intervalo_min": "5",
-    "timeout_s": "20",
-    "retencao_dados_dias": "30",
-    "retencao_logs_dias": "30",
-}
 
 
 def caminho_banco():
@@ -106,10 +89,9 @@ def conexao():
 def criar_schema(conn):
     """Cria as tabelas, o índice de busca e ativa o modo WAL.
 
-    Aplica os seeds iniciais com INSERT OR IGNORE: o modelo NF-e em
-    ``modelos_dfe`` e os padrões operacionais em ``configuracoes``. Por usar
-    OR IGNORE, a função é idempotente — rodar de novo não sobrescreve valores
-    já editados pelo usuário.
+    Aplica o seed inicial do modelo NF-e com ``INSERT OR IGNORE`` (idempotente)
+    e remove a tabela legada ``configuracoes`` — os valores operacionais agora
+    vivem em ``config.json`` na raiz do projeto.
 
     Args:
         conn: Conexão sqlite3 aberta (ex.: obtida pela função conexao()).
@@ -119,6 +101,9 @@ def criar_schema(conn):
     """
     conn.execute("PRAGMA journal_mode=WAL")
     conn.executescript(_SCHEMA)
+
+    # Migração de bancos legados: configurações saíram do banco para config.json.
+    conn.execute("DROP TABLE IF EXISTS configuracoes")
 
     # Migração defensiva: CREATE TABLE IF NOT EXISTS não altera tabelas que já
     # existem, então bancos criados antes do M3 não ganham a coluna dh_recebto.
@@ -135,16 +120,8 @@ def criar_schema(conn):
         ("nfe", "NF-e", "/v1/nfe/service-status", 1),
     )
 
-    # Seed dos padrões operacionais; atualizado_em em ISO 8601 UTC.
-    agora = datetime.now(timezone.utc).isoformat()
-    conn.executemany(
-        "INSERT OR IGNORE INTO configuracoes (chave, valor, atualizado_em) "
-        "VALUES (?, ?, ?)",
-        [(chave, valor, agora) for chave, valor in _PADROES_CONFIG.items()],
-    )
-
     logger.info(
-        "Schema garantido (leituras, modelos_dfe, configuracoes, segredos + índice + WAL)."
+        "Schema garantido (leituras, modelos_dfe, segredos + índice + WAL)."
     )
 
 

@@ -1,4 +1,3 @@
-import getpass
 import logging
 import os
 import secrets
@@ -9,9 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from src.utils import settings as settings_mod
-from src.utils.config import definir_configuracao
 from src.utils.db import conexao, criar_schema
-from src.utils.segredos import hash_senha
 from src.utils.settings import Settings, carregar_env
 
 logger = logging.getLogger("configurar")
@@ -63,28 +60,12 @@ def anexar_master_key(master_key, caminho_env=None):
     return True
 
 
-def _ler_senha():
-    """Pede a senha do admin duas vezes e valida a igualdade.
-
-    Returns:
-        A senha confirmada, ou None quando vazia ou divergente.
-    """
-    senha = getpass.getpass("Defina a senha do admin (Enter para pular): ")
-    if not senha:
-        print("Nenhuma senha informada; a senha do admin não foi alterada.")
-        return None
-    confirma = getpass.getpass("Confirme a senha: ")
-    if senha != confirma:
-        print("As senhas não conferem; a senha do admin não foi alterada.")
-        return None
-    return senha
-
-
 def main():
-    """Executa o wizard de primeiro boot (idempotente).
+    """Executa o preparo de primeiro boot (idempotente).
 
-    Garante a master key no .env, cria o schema e define/atualiza a senha do
-    admin. As credenciais da API não são tocadas (permanecem no .env).
+    Garante a master key no .env e cria/atualiza o schema do banco. As demais
+    configurações operacionais ficam em ``config.json`` (raiz do projeto) e as
+    credenciais da API permanecem no .env.
 
     Returns:
         None.
@@ -111,12 +92,10 @@ def main():
     with conexao() as conn:
         criar_schema(conn)
 
-    senha = _ler_senha()
-    if senha:
-        definir_configuracao("admin_senha_hash", hash_senha(senha))
-        print("Senha do admin definida/atualizada.")
-
-    print("Configuração concluída. Credenciais da API permanecem no .env.")
+    print(
+        "Preparo concluído. Ajustes operacionais ficam em config.json; "
+        "credenciais da API permanecem no .env."
+    )
 
 
 if __name__ == "__main__":

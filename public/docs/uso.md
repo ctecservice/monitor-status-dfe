@@ -52,30 +52,16 @@ Ao clicar em uma UF no painel, abre-se a página de detalhe. Ela traz:
 
 A página também permite alternar o ambiente (Produção / Homologação) no topo.
 
-## Painel de configuração (`/config`)
+## Atualização, rate limit e anti-robô
 
-O painel `/config` ajusta os filtros operacionais do monitor e é **protegido por senha**. Na primeira visita, exibe um formulário de login; após autenticar, mostra o formulário de configuração.
+O dashboard consulta as APIs JSON públicas a cada **60 segundos** para se atualizar. Para preservar o serviço, essas APIs aplicam duas proteções:
 
-> A senha do painel é definida no primeiro boot, ao rodar `python src/scripts/configurar.py`. Consulte [Configuração](configuracao.md).
-
-Os filtros disponíveis são:
-
-| Filtro | O que faz |
-|---|---|
-| UFs monitoradas | Restringe a coleta a determinadas UFs (vazio = todas) |
-| Modelos ativos | Restringe a coleta a determinados documentos (vazio = todos os ativos) |
-| Intervalo entre coletas | Frequência do ciclo de coleta, em minutos (1 a 1440) |
-| Timeout da API | Tempo máximo de espera por resposta da API, em segundos (1 a 120) |
-| Retenção de dados | Por quantos dias o histórico de leituras é mantido (mínimo 1) |
-| Retenção de logs | Por quantos dias os arquivos de log são mantidos (mínimo 1) |
-
-As alterações são aplicadas ao ciclo seguinte, sem reiniciar a aplicação. A retenção é aplicada por uma tarefa diária.
-
-Ao terminar, use o botão **Sair** para encerrar a sessão do painel.
+- **Limite de requisições por IP** — no máximo 30 requisições por minuto (valor configurável na instalação). Se o limite for excedido, a API devolve `429` e o painel tenta novamente em instantes. Em uso normal do site isso não é perceptível: o polling automático fica bem abaixo do limite.
+- **Verificação anti-robô (Cloudflare Turnstile)** — quando habilitada pela instalação, o painel resolve uma verificação anti-robô em segundo plano antes de carregar/atualizar os dados. Ela roda de forma automática e invisível (o visitante normalmente não vê nada nem precisa agir); só em casos excepcionais a Cloudflare pode pedir uma interação. Quando essa proteção está desligada (configuração padrão de desenvolvimento), nada acontece.
 
 ## Endpoint de saúde (`/health`)
 
-O endpoint `/health` devolve um JSON com a situação do monitor, útil para monitoramento externo e verificações automáticas:
+O endpoint `/health` devolve um JSON com a situação do monitor, útil para monitoramento externo e verificações automáticas. Responde **HTTP 200** quando o banco está acessível e o agendador está ativo; **HTTP 503** caso contrário.
 
 ```json
 {
@@ -89,7 +75,7 @@ O endpoint `/health` devolve um JSON com a situação do monitor, útil para mon
 
 | Campo | Significado |
 |---|---|
-| `status` | `ok` quando o endpoint responde |
+| `status` | `ok` (HTTP 200) quando banco e agendador estão saudáveis; `erro` (HTTP 503) caso contrário |
 | `banco` | `ok` se o banco respondeu; `erro` em caso de falha |
 | `scheduler` | `ativo` quando o agendador está em execução; `inativo` caso contrário |
 | `ultima_coleta` | Data/hora da leitura mais recente |

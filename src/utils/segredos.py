@@ -1,7 +1,4 @@
 import base64
-import binascii
-import hashlib
-import hmac
 import json
 import logging
 import os
@@ -155,51 +152,6 @@ def buscar_segredo(chave):
     return decifrar(_master_key(), row["payload"])
 
 
-def hash_senha(senha):
-    """Gera um hash irreversível da senha (PBKDF2-HMAC-SHA256).
-
-    Formato de armazenamento: ``pbkdf2_sha256$<iteracoes>$<salt_b64>$<hash_b64>``.
-    O hash é irreversível (diferente do Fernet, usado para segredos reversíveis).
-
-    Args:
-        senha: Senha em texto claro.
-
-    Returns:
-        str no formato acima.
-    """
-    salt = os.urandom(_SALT_BYTES)
-    derivado = hashlib.pbkdf2_hmac("sha256", senha.encode("utf-8"), salt, _ITERACOES)
-    salt_b64 = base64.b64encode(salt).decode("ascii")
-    hash_b64 = base64.b64encode(derivado).decode("ascii")
-    return f"pbkdf2_sha256${_ITERACOES}${salt_b64}${hash_b64}"
-
-
-def verificar_senha(senha, hash_armazenado):
-    """Confere uma senha contra o hash armazenado, em tempo constante.
-
-    Args:
-        senha: Senha em texto claro.
-        hash_armazenado: Hash no formato produzido por :func:`hash_senha`.
-
-    Returns:
-        True se a senha confere; False em qualquer outro caso (inclusive hash
-        malformado).
-    """
-    try:
-        algoritmo, iteracoes, salt_b64, hash_b64 = hash_armazenado.split("$")
-        if algoritmo != "pbkdf2_sha256":
-            return False
-        salt = base64.b64decode(salt_b64)
-        esperado = base64.b64decode(hash_b64)
-        derivado = hashlib.pbkdf2_hmac(
-            "sha256", senha.encode("utf-8"), salt, int(iteracoes)
-        )
-    except (ValueError, TypeError, binascii.Error):
-        return False
-    # compare_digest evita ataques de temporização na comparação.
-    return hmac.compare_digest(derivado, esperado)
-
-
 if __name__ == "__main__":
     from src.utils.settings import carregar_env
 
@@ -209,7 +161,3 @@ if __name__ == "__main__":
     original = "segredo-de-teste-áçãõ"
     recuperado = decifrar(chave_teste, cifrar(chave_teste, original))
     print("round-trip cifrar/decifrar:", recuperado == original)
-
-    hash_teste = hash_senha("senha-teste")
-    print("hash/verificar (correta):", verificar_senha("senha-teste", hash_teste))
-    print("hash/verificar (errada):", verificar_senha("outra", hash_teste))

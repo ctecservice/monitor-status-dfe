@@ -5,11 +5,11 @@ Documentação pública do projeto. Aqui você encontra desde o passo a passo de
 ## Começando
 
 - [Como executar](como-executar.md) — instalação e execução local do zero (Windows e Linux), com solução de problemas comuns.
-- [Configuração](configuracao.md) — primeiro boot, variáveis do `.env` e filtros do painel `/config`.
+- [Configuração](configuracao.md) — primeiro boot, variáveis do `.env` e arquivo `config.json`.
 
 ## Operação e uso
 
-- [Uso do painel](uso.md) — dashboard, página de detalhe por UF, painel de configuração e endpoint de saúde.
+- [Uso do painel](uso.md) — dashboard, página de detalhe por UF, rate limit e endpoint de saúde.
 - [API JSON](api.md) — referência das APIs públicas com exemplos de resposta.
 
 ## Entendimento e implantação

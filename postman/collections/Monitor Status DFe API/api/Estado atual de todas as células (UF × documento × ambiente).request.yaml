@@ -1,0 +1,16 @@
+$kind: http-request
+description: |
+  Devolve a leitura mais recente de cada combinação UF × documento × ambiente. É o endpoint consumido pelo polling do dashboard.
+url: "{{baseUrl}}/api/status"
+method: GET
+headers:
+  - key: CF-Turnstile-Token
+    value: string
+    disabled: false
+    description: |
+      Token do Cloudflare Turnstile. Exigido APENAS quando a proteção anti-bot está habilitada na instalação; sem chaves configuradas, o cabeçalho é ignorado.
+  - key: Accept
+    value: application/json
+settings: {}
+examples: ./.resources/Estado atual de todas as células (UF × documento × ambiente).resources/examples
+order: 1000

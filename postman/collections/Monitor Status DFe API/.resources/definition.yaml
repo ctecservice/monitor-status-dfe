@@ -1,0 +1,14 @@
+$kind: collection
+description: |
+  API JSON pública do Monitor Status DFe (projeto open-source, MIT — desenvolvido e mantido pela CTEC). Alimenta o dashboard e a página de detalhe por UF e pode ser consumida por integrações externas.
+  **Proteções aplicadas às rotas `/api/*`:** - *Rate limit*: por padrão 30 requisições por minuto por endereço IP
+    (configurável em `config.json` → `rate_limit.api_requisicoes_por_minuto`).
+    Resposta de excesso: HTTP 429 com cabeçalho `Retry-After: 60`.
+  - *Anti-bot opcional (Cloudflare Turnstile)*: quando configurado
+    (`TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` no `.env`), as rotas `/api/*`
+    exigem o cabeçalho `CF-Turnstile-Token` com token válido; ausente/inválido
+    responde HTTP 403.
+
+  Horários retornados estão em ISO 8601 UTC (sufixo `Z` ou offset); a interface exibe em America/Sao_Paulo.
+variables:
+  baseUrl: https://monitor.exemplo.com

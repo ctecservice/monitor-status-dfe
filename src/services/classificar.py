@@ -15,6 +15,14 @@ COR_INSTAVEL = "#F59E0B"       # amarelo
 COR_INDISPONIVEL = "#EF4444"   # vermelho
 COR_SEM_DADOS = "#8A8585"      # cinza
 
+# Rótulos exibíveis na UI para cada estado (estado -> texto capitalizado).
+ROTULOS_ESTADO = {
+    ESTADO_OPERACIONAL: "Operacional",
+    ESTADO_INSTAVEL: "Instável",
+    ESTADO_INDISPONIVEL: "Indisponível",
+    ESTADO_SEM_DADOS: "Sem dados",
+}
+
 # Mapa cStat -> (estado, cor). Fonte: API DadosJah (portal nacional DF-e).
 _POR_CSTAT = {
     "107": (ESTADO_OPERACIONAL, COR_OPERACIONAL),
@@ -43,6 +51,20 @@ def classificar(cstat, erro=None):
     chave = str(cstat).strip() if cstat is not None else ""
     estado, cor = _POR_CSTAT.get(chave, (ESTADO_SEM_DADOS, COR_SEM_DADOS))
     return {"estado": estado, "cor": cor}
+
+
+def rotulo_estado(estado):
+    """Devolve o rótulo exibível de um estado do semáforo.
+
+    Args:
+        estado: Estado em snake_case (ex.: ``sem_dados``). Pode ser None ou
+            um valor desconhecido.
+
+    Returns:
+        str com o rótulo exibível; ``"Sem dados"`` quando o valor for ausente
+        ou desconhecido.
+    """
+    return ROTULOS_ESTADO.get(estado, ROTULOS_ESTADO[ESTADO_SEM_DADOS])
 
 
 if __name__ == "__main__":

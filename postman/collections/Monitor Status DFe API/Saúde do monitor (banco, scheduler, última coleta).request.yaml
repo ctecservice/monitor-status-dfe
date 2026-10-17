@@ -1,0 +1,10 @@
+$kind: http-request
+description: |
+  HTTP 200 apenas quando o banco está acessível E o scheduler está ativo; caso contrário, HTTP 503 com `status: erro`. Não tem rate limit nem proteção anti-bot.
+url: "{{baseUrl}}/health"
+method: GET
+headers:
+  Accept: application/json
+settings: {}
+examples: ./.resources/Saúde do monitor (banco, scheduler, última coleta).resources/examples
+order: 2000

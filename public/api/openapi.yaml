@@ -1,0 +1,375 @@
+openapi: 3.0.3
+info:
+  title: Monitor Status DFe — API pública
+  version: 1.0.0
+  description: >
+    API JSON pública do Monitor Status DFe (projeto open-source, MIT — desenvolvido
+    e mantido pela CTEC). Alimenta o dashboard e a página de detalhe por UF e pode
+    ser consumida por integrações externas.
+
+    **Proteções aplicadas às rotas `/api/*`:**
+    - *Rate limit*: por padrão 30 requisições por minuto por endereço IP
+      (configurável em `config.json` → `rate_limit.api_requisicoes_por_minuto`).
+      Resposta de excesso: HTTP 429 com cabeçalho `Retry-After: 60`.
+    - *Anti-bot opcional (Cloudflare Turnstile)*: quando configurado
+      (`TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` no `.env`), as rotas `/api/*`
+      exigem o cabeçalho `CF-Turnstile-Token` com token válido; ausente/inválido
+      responde HTTP 403.
+
+    Horários retornados estão em ISO 8601 UTC (sufixo `Z` ou offset); a interface
+    exibe em America/Sao_Paulo.
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+servers:
+  - url: https://monitor.exemplo.com
+    description: Substitua pelo domínio da sua instalação (porta padrão 5628)
+tags:
+  - name: status
+    description: Estado atual das células e histórico por UF
+  - name: saude
+    description: Saúde do serviço
+paths:
+  /api/status:
+    get:
+      tags: [status]
+      summary: Estado atual de todas as células (UF × documento × ambiente)
+      description: >
+        Devolve a leitura mais recente de cada combinação UF × documento ×
+        ambiente. É o endpoint consumido pelo polling do dashboard.
+      parameters:
+        - $ref: '#/components/parameters/TurnstileToken'
+      responses:
+        '200':
+          description: Células atuais com rótulos exibíveis.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StatusPayload'
+              example:
+                gerado_em: '2026-10-17T13:27:05.481561+00:00'
+                ambientes:
+                  - tp_amb: 1
+                    rotulo: Producao
+                  - tp_amb: 2
+                    rotulo: Homologacao
+                celulas:
+                  - uf: MG
+                    documento: nfe
+                    tp_amb: 1
+                    estado: operacional
+                    rotulo: Operacional
+                    cor: '#22C55E'
+                    cstat: '107'
+                    t_med: 512
+                    response_time: 480
+                    coletado_em: '2026-10-17T13:27:05.481561+00:00'
+                    erro: null
+        '403':
+          $ref: '#/components/responses/AntibotRecusado'
+        '429':
+          $ref: '#/components/responses/RateLimitExcedido'
+  /api/uf/{uf}/historico:
+    get:
+      tags: [status]
+      summary: Série histórica de uma UF (uptime e sparkline)
+      parameters:
+        - name: uf
+          in: path
+          required: true
+          description: "Sigla da UF (ex.: MG). Inválida responde 404."
+          schema:
+            type: string
+            example: MG
+        - name: horas
+          in: query
+          required: false
+          description: "Tamanho da janela em horas (1 a 720). Padrão: 24."
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 720
+            default: 24
+        - name: documento
+          in: query
+          required: false
+          description: "Código do modelo (ex.: nfe). Padrão: primeiro modelo ativo."
+          schema:
+            type: string
+            example: nfe
+        - name: tp_amb
+          in: query
+          required: false
+          description: "Ambiente — 1 (produção) ou 2 (homologação). Padrão: 1."
+          schema:
+            type: integer
+            enum: [1, 2]
+            default: 1
+        - $ref: '#/components/parameters/TurnstileToken'
+      responses:
+        '200':
+          description: Pontos da janela, uptime e último status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoricoPayload'
+              example:
+                uf: MG
+                horas: 24
+                documento: nfe
+                tp_amb: 1
+                pontos:
+                  - coletado_em: '2026-10-17T10:00:00+00:00'
+                    cstat: '107'
+                    estado: operacional
+                    cor: '#22C55E'
+                    t_med: 512
+                    response_time: 480
+                    erro: null
+                uptime_pct: 100.0
+                ultimo:
+                  uf: MG
+                  documento: nfe
+                  tp_amb: 1
+                  estado: operacional
+                  rotulo: Operacional
+                  cor: '#22C55E'
+                  cstat: '107'
+                  t_med: 512
+                  response_time: 480
+                  coletado_em: '2026-10-17T13:27:05.481561+00:00'
+                  erro: null
+                  msg: null
+                  x_motivo: null
+                  ver_aplic: null
+                  dh_recebto: null
+        '400':
+          description: Parâmetro inválido (horas ou tp_amb fora das faixas).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+              example:
+                erro: "Parâmetro 'tp_amb' deve ser 1 ou 2."
+        '404':
+          description: UF inválida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+              example:
+                erro: UF inválida.
+        '403':
+          $ref: '#/components/responses/AntibotRecusado'
+        '429':
+          $ref: '#/components/responses/RateLimitExcedido'
+  /health:
+    get:
+      tags: [saude]
+      summary: Saúde do monitor (banco, scheduler, última coleta)
+      description: >
+        HTTP 200 apenas quando o banco está acessível E o scheduler está ativo;
+        caso contrário, HTTP 503 com `status: erro`. Não tem rate limit nem
+        proteção anti-bot.
+      responses:
+        '200':
+          description: Serviço saudável.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: ok
+                banco: ok
+                scheduler: ativo
+                ultima_coleta: '2026-10-17T13:27:05.481561+00:00'
+                leituras_total: 226
+        '503':
+          description: Banco com erro ou scheduler inativo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Health'
+              example:
+                status: erro
+                banco: ok
+                scheduler: inativo
+                ultima_coleta: null
+                leituras_total: 0
+components:
+  parameters:
+    TurnstileToken:
+      name: CF-Turnstile-Token
+      in: header
+      required: false
+      description: >
+        Token do Cloudflare Turnstile. Exigido APENAS quando a proteção anti-bot
+        está habilitada na instalação; sem chaves configuradas, o cabeçalho é
+        ignorado.
+      schema:
+        type: string
+  responses:
+    RateLimitExcedido:
+      description: Limite de requisições por IP excedido.
+      headers:
+        Retry-After:
+          description: Segundos até poder tentar novamente.
+          schema:
+            type: integer
+            example: 60
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+          example:
+            erro: Limite de requisições excedido. Tente novamente em instantes.
+    AntibotRecusado:
+      description: Verificação anti-bot ausente ou inválida (apenas quando habilitada).
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Erro'
+          example:
+            erro: Verificação anti-bot falhou.
+  schemas:
+    Erro:
+      type: object
+      properties:
+        erro:
+          type: string
+          description: Mensagem de erro (PT-BR).
+    Ambiente:
+      type: object
+      properties:
+        tp_amb:
+          type: integer
+          enum: [1, 2]
+          description: 1 = produção, 2 = homologação.
+        rotulo:
+          type: string
+          example: Producao
+    Celula:
+      type: object
+      properties:
+        uf:
+          type: string
+          example: MG
+        documento:
+          type: string
+          example: nfe
+        tp_amb:
+          type: integer
+          enum: [1, 2]
+        estado:
+          type: string
+          enum: [operacional, instavel, indisponivel, sem_dados]
+          description: Estado interno (snake_case).
+        rotulo:
+          type: string
+          description: "Rótulo exibível do estado (ex.: Operacional)."
+          example: Operacional
+        cor:
+          type: string
+          description: Cor do semáforo no formato hexadecimal.
+          example: '#22C55E'
+        cstat:
+          type: [string, 'null']
+          description: cStat retornado pela API de consulta (107/108/109...).
+        t_med:
+          type: [integer, 'null']
+          description: Tempo médio informado pela API, em ms.
+        response_time:
+          type: [integer, 'null']
+          description: Tempo de resposta medido pelo cliente, em ms.
+        coletado_em:
+          type: [string, 'null']
+          description: Instante da coleta (ISO 8601 UTC).
+        erro:
+          type: [string, 'null']
+          description: Descrição de falha na coleta, se houver.
+    Ponto:
+      type: object
+      properties:
+        coletado_em:
+          type: string
+        cstat:
+          type: [string, 'null']
+        estado:
+          type: string
+          enum: [operacional, instavel, indisponivel, sem_dados]
+        cor:
+          type: string
+        t_med:
+          type: [integer, 'null']
+        response_time:
+          type: [integer, 'null']
+        erro:
+          type: [string, 'null']
+    Ultimo:
+      allOf:
+        - $ref: '#/components/schemas/Celula'
+        - type: object
+          properties:
+            msg:
+              type: [string, 'null']
+              description: Mensagem da API de consulta.
+            x_motivo:
+              type: [string, 'null']
+              description: Motivo retornado pela API (xMotivo).
+            ver_aplic:
+              type: [string, 'null']
+              description: Versão da aplicação na SEFAZ.
+            dh_recebto:
+              type: [string, 'null']
+              description: Data/hora de recebimento informada pela API.
+    StatusPayload:
+      type: object
+      properties:
+        gerado_em:
+          type: string
+          description: Instante de geração (ISO 8601 UTC).
+        ambientes:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ambiente'
+        celulas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Celula'
+    HistoricoPayload:
+      type: object
+      properties:
+        uf:
+          type: string
+        horas:
+          type: integer
+        documento:
+          type: string
+        tp_amb:
+          type: integer
+          enum: [1, 2]
+        pontos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Ponto'
+        uptime_pct:
+          type: number
+          description: Percentual de pontos operacionais na janela (0 a 100).
+        ultimo:
+          $ref: '#/components/schemas/Ultimo'
+    Health:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok, erro]
+        banco:
+          type: string
+          enum: [ok, erro]
+        scheduler:
+          type: string
+          enum: [ativo, inativo]
+        ultima_coleta:
+          type: [string, 'null']
+        leituras_total:
+          type: integer

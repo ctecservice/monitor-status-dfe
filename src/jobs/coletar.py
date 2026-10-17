@@ -7,7 +7,7 @@ from pathlib import Path
 # Permite executar o modulo de qualquer pasta: coloca a raiz do projeto no sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from src.services import api_dadosjah, classificar
+from src.motores import criar_motor
 from src.utils import config
 from src.utils.db import conexao, criar_schema
 from src.utils.settings import Settings, carregar_env
@@ -35,31 +35,29 @@ def _int_ou_none(valor):
         return None
 
 
-def _coletar_uma(conn, modelo, uf, tp_amb, timeout_s):
-    """Executa uma consulta e grava a leitura correspondente.
+def _coletar_uma(conn, motor, modelo, uf, tp_amb, timeout_s, token):
+    """Executa uma consulta pelo motor e grava a leitura correspondente.
 
     A falha da API não levanta exceção: a leitura é gravada com o campo
     ``erro`` preenchido e o ciclo continua.
 
     Args:
         conn: Conexão SQLite reutilizada pelo ciclo.
+        motor: Motor de consulta criado no início do ciclo.
         modelo: Dicionário do modelo (``codigo``, ``nome``, ``endpoint``).
         uf: Sigla da UF.
         tp_amb: Ambiente (1 = produção, 2 = homologação).
         timeout_s: Timeout da requisição, em segundos.
+        token: Credencial obtida pelo motor no início do ciclo.
 
     Returns:
         True se a consulta teve sucesso, False caso contrário.
     """
-    resultado = api_dadosjah.consultar_status(
-        uf, modelo["endpoint"], tp_amb, timeout_s
+    resultado = motor.consultar_status(
+        uf, modelo["endpoint"], tp_amb, timeout_s, token
     )
     dados = resultado["dados"] or {}
     erro = resultado["erro"]
-
-    # A classificação alimenta o resumo/log do ciclo (a tabela leituras guarda
-    # o cStat bruto + erro; o estado é derivado na camada de apresentação).
-    classificar.classificar(dados.get("cStat"), erro=erro)
 
     conn.execute(
         """
@@ -88,7 +86,13 @@ def _coletar_uma(conn, modelo, uf, tp_amb, timeout_s):
 
 
 def executar_ciclo():
-    """Roda um ciclo de coleta completo, relendo as configurações do banco.
+    """Roda um ciclo de coleta completo, usando as configurações em memória.
+
+    O ciclo autentica no motor configurado (``config.motor_ativo()``) antes das
+    consultas e encerra a sessão no final, mesmo em caso de erro. O token fica
+    em memória apenas durante o ciclo: todas as consultas usam a mesma
+    credencial e o logout é garantido no ``finally``. Se a autenticação falhar,
+    nenhuma consulta é feita e o resumo volta zerado.
 
     Itera sequencialmente modelos ativos × UFs × ambientes e grava uma leitura
     por consulta. Uma única conexão SQLite é aberta por ciclo e reutilizada
@@ -105,23 +109,50 @@ def executar_ciclo():
     tp_ambs = Settings.lista_tp_ambs()
     timeout_s = config.timeout_s()
 
+    motor_nome = config.motor_ativo()
+    motor = criar_motor(motor_nome)
+
+    try:
+        token = motor.autenticar()
+    except Exception as exc:
+        duracao_s = time.perf_counter() - inicio
+        logger.error("Falha ao autenticar no motor '%s': %s", motor_nome, exc)
+        return {"total": 0, "sucessos": 0, "falhas": 0, "duracao_s": duracao_s}
+
     logger.info(
-        "Iniciando ciclo: %s modelo(s) × %s UF(s) × %s ambiente(s).",
+        "Iniciando ciclo (motor=%s): %s modelo(s) × %s UF(s) × %s ambiente(s).",
+        motor_nome,
         len(modelos),
         len(ufs),
         len(tp_ambs),
     )
 
     total = sucessos = falhas = 0
-    with conexao() as conn:
-        for modelo in modelos:
-            for uf in ufs:
-                for tp_amb in tp_ambs:
-                    total += 1
-                    if _coletar_uma(conn, modelo, uf, tp_amb, timeout_s):
-                        sucessos += 1
-                    else:
-                        falhas += 1
+    try:
+        with conexao() as conn:
+            for modelo in modelos:
+                for uf in ufs:
+                    for tp_amb in tp_ambs:
+                        total += 1
+                        if _coletar_uma(
+                            conn, motor, modelo, uf, tp_amb, timeout_s, token
+                        ):
+                            sucessos += 1
+                        else:
+                            falhas += 1
+                        # Commit por leitura: em WAL, gravar cada INSERT de
+                        # imediato evita que uma exceção no meio do ciclo
+                        # descarte (rollback do context manager) as leituras
+                        # já coletadas.
+                        conn.commit()
+    finally:
+        # Logout sempre executado; falha no encerramento não interrompe o job.
+        try:
+            motor.encerrar(token)
+        except Exception as exc:
+            logger.warning(
+                "Falha ao encerrar sessão do motor '%s': %s", motor_nome, exc
+            )
 
     duracao_s = time.perf_counter() - inicio
     logger.info(

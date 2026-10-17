@@ -1,0 +1,69 @@
+$kind: http-example
+name: Pontos da janela, uptime e último status.
+request:
+  url: "{{baseUrl}}/api/uf/:uf/historico?horas=24&documento=nfe&tp_amb=1"
+  method: GET
+  headers:
+    - key: CF-Turnstile-Token
+      value: string
+      disabled: false
+      description: |
+        Token do Cloudflare Turnstile. Exigido APENAS quando a proteção anti-bot está habilitada na instalação; sem chaves configuradas, o cabeçalho é ignorado.
+    - key: Accept
+      value: application/json
+  queryParams:
+    horas: "24"
+    documento: nfe
+    tp_amb: "1"
+  pathVariables:
+    - key: uf
+      value: MG
+      disabled: false
+      description: "(Required) Sigla da UF (ex.: MG). Inválida responde 404."
+  body:
+    type: text
+    content: ""
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "uf": "MG",
+        "horas": 24,
+        "documento": "nfe",
+        "tp_amb": 1,
+        "pontos": [
+          {
+            "coletado_em": "2026-10-17T10:00:00+00:00",
+            "cstat": "107",
+            "estado": "operacional",
+            "cor": "#22C55E",
+            "t_med": 512,
+            "response_time": 480,
+            "erro": null
+          }
+        ],
+        "uptime_pct": 100,
+        "ultimo": {
+          "uf": "MG",
+          "documento": "nfe",
+          "tp_amb": 1,
+          "estado": "operacional",
+          "rotulo": "Operacional",
+          "cor": "#22C55E",
+          "cstat": "107",
+          "t_med": 512,
+          "response_time": 480,
+          "coletado_em": "2026-10-17T13:27:05.481561+00:00",
+          "erro": null,
+          "msg": null,
+          "x_motivo": null,
+          "ver_aplic": null,
+          "dh_recebto": null
+        }
+      }
+order: 1000

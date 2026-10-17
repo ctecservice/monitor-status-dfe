@@ -16,6 +16,8 @@ Não utilize o serviço como única fonte para decisões de emissão de document
 
 Você se compromete a utilizar o serviço de forma razoável, sem sobrecarregar a infraestrutura, sem tentar burlar mecanismos de segurança, sem comprometer a integridade do serviço e sem utilizá-lo para finalidades ilícitas.
 
+Para proteger o serviço contra abuso automatizado, podem ser aplicados limites de acesso por endereço IP e um mecanismo de verificação anti-robô (Cloudflare Turnstile). Esse mecanismo pode processar dados técnicos mínimos da sua conexão, conforme a política de privacidade da Cloudflare.
+
 ## 4. Proibições
 
 Não é permitido:
@@ -29,7 +31,7 @@ O código-fonte é disponibilizado sob licença de código aberto, que rege espe
 
 ## 5. Dados
 
-O serviço **não coleta dados pessoais de visitantes** e não exige cadastro para consulta. As informações exibidas e armazenadas são dados técnicos públicos de status dos serviços SEFAZ, sem dados pessoais ou fiscais de contribuintes. Credenciais de operadores de instalações próprias permanecem sob responsabilidade de quem opera cada instalação. Registros técnicos de operação (como tentativas de acesso ao painel administrativo) podem ser mantidos temporariamente em logs locais e são excluídos conforme a retenção configurada.
+O serviço **não coleta dados pessoais de visitantes** e não exige cadastro para consulta. As informações exibidas e armazenadas são dados técnicos públicos de status dos serviços SEFAZ, sem dados pessoais ou fiscais de contribuintes. Credenciais de operadores de instalações próprias permanecem sob responsabilidade de quem opera cada instalação. Registros técnicos de operação (como tentativas de acesso ao painel administrativo) e de proteção anti-robô podem ser mantidos temporariamente em logs locais e são excluídos conforme a retenção configurada.
 
 ## 6. Alterações
 
@@ -37,4 +39,8 @@ Estes termos podem ser atualizados a qualquer momento. A versão vigente é semp
 
 ## 7. Contato
 
-Dúvidas sobre estes termos podem ser encaminhadas pelos canais oficiais do projeto em [dadosjah.com.br](https://dadosjah.com.br).
+Dúvidas sobre estes termos podem ser encaminhadas pelos canais oficiais do projeto em [dadosjah.com.br](https://dadosjah.com.br) ou [ctec.com.br](https://ctec.com.br/).
+
+---
+
+Projeto open-source (MIT) · Desenvolvido e mantido pela [CTEC](https://ctec.com.br/).

@@ -8,25 +8,12 @@ import httpx
 # Permite executar o modulo de qualquer pasta: coloca a raiz do projeto no sys.path
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
-from src.services import auth_dadosjah
 from src.utils.settings import Settings
 
 logger = logging.getLogger("api_dadosjah")
 
 # Tamanho máximo do trecho de mensagem da API incluído no campo ``erro``.
 _TAMANHO_MENSAGEM = 150
-
-
-def _erro(mensagem):
-    """Empacota um resultado de falha no formato padrão de retorno.
-
-    Args:
-        mensagem: Descrição curta do erro.
-
-    Returns:
-        dict ``{"ok": False, "dados": None, "erro": mensagem}``.
-    """
-    return {"ok": False, "dados": None, "erro": mensagem}
 
 
 def _mensagem_erro(status_code, corpo):
@@ -52,7 +39,7 @@ def _mensagem_erro(status_code, corpo):
     return mensagem
 
 
-def _executar_get(url, params, token, timeout_s):
+def _executar_get(url, params, token, timeout_s, client=None):
     """Executa o GET autenticado, isolando falhas de rede/timeout.
 
     Args:
@@ -60,6 +47,9 @@ def _executar_get(url, params, token, timeout_s):
         params: Query params (``{"UF": ..., "tpAmb": ...}``).
         token: accessToken a enviar no header Authorization.
         timeout_s: Timeout em segundos.
+        client: ``httpx.Client`` reutilizável (ex.: criado uma vez por ciclo
+            pelo motor). Quando None, um cliente local é criado e fechado a
+            cada chamada (compatibilidade com chamadas avulsas).
 
     Returns:
         dict ``{"status_code", "corpo", "response_time", "erro"}``. Em falha
@@ -69,12 +59,22 @@ def _executar_get(url, params, token, timeout_s):
     # relógio do sistema.
     inicio = time.perf_counter()
     try:
-        with httpx.Client(timeout=timeout_s) as client:
+        if client is not None:
+            # O timeout por requisição sobrepõe o default do cliente, então o
+            # mesmo cliente serve a todos os timeouts do ciclo.
             resposta = client.get(
                 url,
                 params=params,
                 headers={"Authorization": f"Bearer {token}"},
+                timeout=timeout_s,
             )
+        else:
+            with httpx.Client(timeout=timeout_s) as local:
+                resposta = local.get(
+                    url,
+                    params=params,
+                    headers={"Authorization": f"Bearer {token}"},
+                )
         response_time = int((time.perf_counter() - inicio) * 1000)
         try:
             corpo = resposta.json()
@@ -132,62 +132,68 @@ def _normalizar_resposta(dados):
     return dados
 
 
-def consultar_status(uf, endpoint, tp_amb, timeout_s):
-    """Consulta o status de um serviço SEFAZ na API DadosJah (autenticado).
+def consultar_status(uf, endpoint, tp_amb, timeout_s, token, client=None):
+    """Consulta o status de um serviço SEFAZ na API DadosJah.
 
-    Autentica via :func:`src.services.auth_dadosjah.obter_token`, envia o
-    header ``Authorization: Bearer <token>`` e mede o tempo de resposta em
-    milissegundos (devolvido em ``dados["response_time"]``). A resposta é
-    achatada por :func:`_normalizar_resposta` (campos de ``data.status`` vão
-    para a raiz), preservando também o ``responseTime`` informado pela API; o
-    ``response_time`` do cliente tem precedência. Em HTTP 401/403, renova o
-    token e tenta **uma** vez mais. Respostas não-200 incluem o trecho de
-    ``message`` da API no campo ``erro``. Nunca loga o token.
+    Recebe o token já obtido pelo motor (a autenticação é responsabilidade do
+    ciclo de coleta) e envia o header ``Authorization: Bearer <token>``.
+    Mede o tempo de resposta em milissegundos (devolvido em
+    ``dados["response_time"]``). A resposta é achatada por
+    :func:`_normalizar_resposta` (campos de ``data.status`` vão para a raiz),
+    preservando também o ``responseTime`` informado pela API; o
+    ``response_time`` do cliente tem precedência. Respostas não-200 incluem o
+    trecho de ``message`` da API no campo ``erro``. Nunca loga o token.
 
     Args:
         uf: Sigla da UF (ex.: ``MG``).
         endpoint: Caminho relativo do modelo (ex.: ``/v1/nfe/service-status``).
         tp_amb: Ambiente (1 = produção, 2 = homologação).
         timeout_s: Timeout da requisição, em segundos.
+        token: accessToken do ciclo, a enviar no header Authorization.
+        client: ``httpx.Client`` opcional para reuso por ciclo. Quando
+            informado, é usado em vez de abrir um cliente local; o chamador é
+            responsável por fechá-lo.
 
     Returns:
-        dict ``{"ok": bool, "dados": dict | None, "erro": str | None}``.
+        dict ``{"ok": bool, "dados": dict | None, "erro": str | None,
+        "status_code": int | None}``. ``status_code`` é metadado interno usado
+        pelo motor para detectar 401/403 e refazer o login.
     """
     url = f"{Settings.API_BASE_URL}{endpoint}"
     params = {"UF": uf, "tpAmb": tp_amb}
 
-    try:
-        token = auth_dadosjah.obter_token()
-    except Exception as exc:
-        logger.warning("UF=%s endpoint=%s falha de autenticação: %s", uf, endpoint, exc)
-        return _erro(f"falha de autenticação: {exc}")
-
-    resultado = _executar_get(url, params, token, timeout_s)
-
-    if resultado["erro"] is None and resultado["status_code"] in (401, 403):
-        # Token possivelmente expirado/revogado: renova e tenta uma vez.
-        logger.info("UF=%s endpoint=%s HTTP %s; renovando token.", uf, endpoint, resultado["status_code"])
-        try:
-            token = auth_dadosjah.obter_token(forcar=True)
-        except Exception as exc:
-            return _erro(f"falha de autenticação: {exc}")
-        resultado = _executar_get(url, params, token, timeout_s)
+    resultado = _executar_get(url, params, token, timeout_s, client)
 
     if resultado["erro"] is not None:
         logger.warning("UF=%s endpoint=%s %s", uf, endpoint, resultado["erro"])
-        return _erro(resultado["erro"])
+        return {
+            "ok": False,
+            "dados": None,
+            "erro": resultado["erro"],
+            "status_code": None,
+        }
 
     if resultado["status_code"] != 200:
         erro = _mensagem_erro(resultado["status_code"], resultado["corpo"])
         logger.warning("UF=%s endpoint=%s %s", uf, endpoint, erro)
-        return _erro(erro)
+        return {
+            "ok": False,
+            "dados": None,
+            "erro": erro,
+            "status_code": resultado["status_code"],
+        }
 
     dados = _normalizar_resposta(resultado["corpo"] or {})
     # response_time (cliente) é inserido após a normalização: como o campo da
     # API se chama responseTime, ambos coexistem e o valor do cliente tem
     # precedência na leitura feita pelo coletor.
     dados["response_time"] = resultado["response_time"]
-    return {"ok": True, "dados": dados, "erro": None}
+    return {
+        "ok": True,
+        "dados": dados,
+        "erro": None,
+        "status_code": resultado["status_code"],
+    }
 
 
 if __name__ == "__main__":
@@ -196,4 +202,7 @@ if __name__ == "__main__":
 
     carregar_env()
     configurar_logger("api_dadosjah")
-    print(consultar_status("MG", "/v1/nfe/service-status", 2, Settings.API_TIMEOUT_S))
+    from src.services.auth_dadosjah import obter_token
+
+    token_teste = obter_token()
+    print(consultar_status("MG", "/v1/nfe/service-status", 2, Settings.API_TIMEOUT_S, token_teste))

@@ -1,0 +1,33 @@
+$kind: http-request
+description: ""
+url: "{{baseUrl}}/api/uf/:uf/historico?horas=24&documento=nfe&tp_amb=1"
+method: GET
+headers:
+  - key: CF-Turnstile-Token
+    value: string
+    disabled: false
+    description: |
+      Token do Cloudflare Turnstile. Exigido APENAS quando a proteção anti-bot está habilitada na instalação; sem chaves configuradas, o cabeçalho é ignorado.
+  - key: Accept
+    value: application/json
+queryParams:
+  - key: horas
+    value: "24"
+    disabled: false
+    description: "Tamanho da janela em horas (1 a 720). Padrão: 24."
+  - key: documento
+    value: nfe
+    disabled: false
+    description: "Código do modelo (ex.: nfe). Padrão: primeiro modelo ativo."
+  - key: tp_amb
+    value: "1"
+    disabled: false
+    description: "Ambiente — 1 (produção) ou 2 (homologação). Padrão: 1."
+pathVariables:
+  - key: uf
+    value: MG
+    disabled: false
+    description: "(Required) Sigla da UF (ex.: MG). Inválida responde 404."
+settings: {}
+examples: ./.resources/Série histórica de uma UF (uptime e sparkline).resources/examples
+order: 2000

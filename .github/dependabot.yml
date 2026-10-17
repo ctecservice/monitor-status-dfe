@@ -1,0 +1,7 @@
+# Atualizacoes automaticas de dependencias (Dependabot).
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly

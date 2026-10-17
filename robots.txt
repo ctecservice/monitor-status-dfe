@@ -5,5 +5,4 @@ User-agent: *
 Allow: /
 Allow: /llms.txt
 Allow: /robots.txt
-Disallow: /config
 Disallow: /api/

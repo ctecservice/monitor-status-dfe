@@ -1,33 +1,22 @@
 import hashlib
-import hmac
 import logging
-import re
 import secrets
 import sys
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from flask import (
-    Flask,
-    Response,
-    flash,
-    jsonify,
-    redirect,
-    render_template,
-    request,
-    session,
-    url_for,
-)
+from flask import Flask, Response, jsonify, render_template, request
 
 # Permite executar o modulo de qualquer pasta: coloca a raiz do projeto no sys.path
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+# (app.py esta em src/ — um nivel abaixo da raiz — por isso parents[1])
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.jobs import coletar, reter
+from src.jobs import backup, coletar, reter
 from src.services import classificar
-from src.utils import config, segredos
+from src.utils import config, turnstile
 from src.utils.db import conexao, criar_schema
+from src.utils.rate_limit import RateLimiter
 from src.utils.settings import RAIZ_PROJETO, Settings, carregar_env
 
 logger = logging.getLogger("app")
@@ -38,30 +27,14 @@ _AMBIENTES = [
     {"tp_amb": 2, "rotulo": "Homologacao"},
 ]
 
+# Rate limit das APIs públicas JSON: limite por IP por minuto, em memória —
+# suficiente para 1 worker; o caminho avançado (gunicorn + nginx) pode somar
+# limit_req no proxy. O limite vem de config.json (rate_limit).
+_RL_API = RateLimiter(config.rate_limit_api_min(), 60)
+
 # Referência ao scheduler em execução. Fica None quando a app é apenas
 # importada (ex.: testes); o /health então reporta "inativo".
 _scheduler = None
-
-# Filtros editáveis na página /config (tabela configuracoes).
-_CHAVES_FILTROS = (
-    "ufs_monitoradas",
-    "modelos_ativos",
-    "intervalo_min",
-    "timeout_s",
-    "retencao_dados_dias",
-    "retencao_logs_dias",
-)
-
-# Listas de filtros: apenas letras, vírgulas e espaços, até 200 caracteres.
-_RE_LISTA = re.compile(r"^[A-Za-z,\s]{0,200}$")
-
-# Rate limit de login em memória, por IP: no máximo _LIMITE_LOGIN tentativas em
-# uma janela de _JANELA_LOGIN_S segundos. Serve para 1 worker gunicorn; o
-# limit_req do nginx (M5) atua como defesa em profundidade, mas o bucket por IP
-# aqui é necessário para o rate limit funcionar corretamente atrás do proxy.
-_LIMITE_LOGIN = 5
-_JANELA_LOGIN_S = 60
-_tentativas_login = {}
 
 
 def scheduler_ativo():
@@ -73,152 +46,42 @@ def scheduler_ativo():
     return bool(_scheduler is not None and getattr(_scheduler, "running", False))
 
 
-def _autenticado():
-    """Informa se a sessão atual está autenticada como admin.
-
-    Returns:
-        True quando a flag de sessão estiver presente; False caso contrário.
-    """
-    return bool(session.get("admin_autenticado"))
-
-
-def _csrf_atual():
-    """Garante e devolve o token CSRF da sessão.
-
-    O token é criado na primeira necessidade (ex.: render do formulário) e
-    reutilizado nas requisições seguintes da mesma sessão.
-
-    Returns:
-        str com o token CSRF.
-    """
-    if "csrf_token" not in session:
-        session["csrf_token"] = secrets.token_urlsafe(16)
-    return session["csrf_token"]
-
-
-def _csrf_valido():
-    """Confere o token CSRF enviado no formulário contra o da sessão.
-
-    Returns:
-        True se ambos existirem e coincidirem; False caso contrário.
-    """
-    enviado = request.form.get("csrf_token", "")
-    esperado = session.get("csrf_token", "")
-    # compare_digest evita ataques de temporização na comparação.
-    return bool(esperado) and hmac.compare_digest(enviado, esperado)
-
-
 def _ip_cliente():
     """Resolve o IP do cliente, respeitando o proxy local (nginx/gunicorn).
 
     Atrás do nginx, o gunicorn binda em 127.0.0.1 e todas as requisições chegam
     com ``remote_addr`` local; nesse caso usamos o ``X-Real-IP`` encaminhado pelo
     proxy. Só confiamos no header quando o cliente direto é de fato o proxy local
-    (127.0.0.1), evitando spoofing por clientes externos.
+    (loopback: ``127.0.0.1`` ou ``::1``), evitando spoofing por clientes externos.
 
     Returns:
         str com o IP do cliente (ou "desconhecido" se indisponível).
     """
     remote = request.remote_addr
-    if remote == "127.0.0.1":
+    if remote in ("127.0.0.1", "::1"):
         return request.headers.get("X-Real-IP") or remote or "desconhecido"
     return remote or "desconhecido"
 
 
-def _login_permitido(ip):
-    """Verifica se o IP ainda pode tentar login na janela corrente.
+def _turnstile_ok():
+    """Verifica a proteção anti-bot (Turnstile) da requisição atual.
 
-    Descarta as tentativas mais antigas que a janela e informa se o limite foi
-    atingido.
-
-    Args:
-        ip: Endereço de origem da requisição.
+    Quando a proteção está desligada (sem chaves no .env), libera sempre. Com
+    a proteção ligada, exige o header ``CF-Turnstile-Token`` e o valida no
+    servidor via :func:`src.utils.turnstile.verificar_token`.
 
     Returns:
-        True se ainda houver tentativas disponíveis; False se excedeu o limite.
+        Tupla ``(ok, mensagem)``: ``ok`` True quando a requisição pode seguir;
+        em caso de bloqueio, ``mensagem`` descreve o motivo.
     """
-    agora = time.monotonic()
-    marcas = [
-        marca
-        for marca in _tentativas_login.get(ip, [])
-        if agora - marca < _JANELA_LOGIN_S
-    ]
-    if marcas:
-        _tentativas_login[ip] = marcas
-    else:
-        # Sem tentativas válidas na janela: remove a chave para o dicionário não
-        # crescer sem limite com IPs rotativos (CWE-770).
-        _tentativas_login.pop(ip, None)
-    return len(marcas) < _LIMITE_LOGIN
-
-
-def _registrar_tentativa(ip):
-    """Registra uma tentativa de login para o IP informado.
-
-    Args:
-        ip: Endereço de origem da requisição.
-
-    Returns:
-        None.
-    """
-    _tentativas_login.setdefault(ip, []).append(time.monotonic())
-
-
-def _validar_filtros(dados_form):
-    """Valida os filtros do painel antes de gravá-los.
-
-    Barra números fora das faixas permitidas e listas com caracteres inválidos,
-    normalizando UFs para maiúsculas e modelos para minúsculas.
-
-    Args:
-        dados_form: Formulário (``request.form``) com os filtros.
-
-    Returns:
-        Tupla ``(valores, None)`` quando tudo é válido, ou ``(None, mensagem)``
-        com a descrição do primeiro erro encontrado.
-    """
-    valores = {}
-    limites = (
-        ("intervalo_min", 1, 1440),
-        ("timeout_s", 1, 120),
-        ("retencao_dados_dias", 1, None),
-        ("retencao_logs_dias", 1, None),
-    )
-    for chave, minimo, maximo in limites:
-        bruto = (dados_form.get(chave) or "").strip()
-        try:
-            numero = int(bruto)
-        except (TypeError, ValueError):
-            return None, f"Valor inválido para {chave}: informe um número inteiro."
-        if numero < minimo or (maximo is not None and numero > maximo):
-            if maximo is not None:
-                return None, f"{chave} deve estar entre {minimo} e {maximo}."
-            return None, f"{chave} deve ser maior ou igual a {minimo}."
-        valores[chave] = str(numero)
-
-    for chave, transformar, rotulo in (
-        ("ufs_monitoradas", str.upper, "UFs monitoradas"),
-        ("modelos_ativos", str.lower, "Modelos ativos"),
-    ):
-        bruto = (dados_form.get(chave) or "").strip()
-        if not _RE_LISTA.match(bruto):
-            return None, (
-                f"{rotulo}: use apenas letras, vírgulas e espaços "
-                "(máximo de 200 caracteres)."
-            )
-        valores[chave] = transformar(bruto)
-    return valores, None
-
-
-def _filtros_atuais():
-    """Lê os filtros operacionais atuais do banco.
-
-    Returns:
-        dict chave -> valor (str) para os filtros de ``_CHAVES_FILTROS``.
-    """
-    return {
-        chave: (config.buscar_configuracao(chave) or "") for chave in _CHAVES_FILTROS
-    }
+    if not turnstile.turnstile_habilitado():
+        return True, None
+    token = request.headers.get("CF-Turnstile-Token")
+    if not token:
+        return False, "Verificação anti-bot ausente."
+    if not turnstile.verificar_token(token, _ip_cliente()):
+        return False, "Verificação anti-bot falhou."
+    return True, None
 
 
 def _ultimas_leituras():
@@ -252,8 +115,8 @@ def _celulas_atuais():
 
     Returns:
         Lista de dicts com ``uf``, ``documento``, ``tp_amb``, ``estado``,
-        ``cor``, ``cstat``, ``t_med``, ``response_time``, ``coletado_em`` e
-        ``erro``.
+        ``rotulo``, ``cor``, ``cstat``, ``t_med``, ``response_time``,
+        ``coletado_em`` e ``erro``.
     """
     celulas = []
     for row in _ultimas_leituras():
@@ -264,6 +127,7 @@ def _celulas_atuais():
                 "documento": row["documento"],
                 "tp_amb": row["tp_amb"],
                 "estado": estado_cor["estado"],
+                "rotulo": classificar.rotulo_estado(estado_cor["estado"]),
                 "cor": estado_cor["cor"],
                 "cstat": row["cstat"],
                 "t_med": row["t_med"],
@@ -307,6 +171,7 @@ def _ultimo_status(uf, documento, tp_amb):
         "documento": row["documento"],
         "tp_amb": row["tp_amb"],
         "estado": estado_cor["estado"],
+        "rotulo": classificar.rotulo_estado(estado_cor["estado"]),
         "cor": estado_cor["cor"],
         "cstat": row["cstat"],
         "t_med": row["t_med"],
@@ -411,6 +276,7 @@ def _ultimo_vazio(uf, documento, tp_amb):
         "documento": documento,
         "tp_amb": tp_amb,
         "estado": classificar.ESTADO_SEM_DADOS,
+        "rotulo": classificar.rotulo_estado(classificar.ESTADO_SEM_DADOS),
         "cor": classificar.COR_SEM_DADOS,
         "cstat": None,
         "t_med": None,
@@ -440,7 +306,7 @@ def _ler_arquivo_raiz(nome):
 
 
 def create_app():
-    """Cria a aplicação Flask com /health e a área /config protegida.
+    """Cria a aplicação Flask com o dashboard, as páginas públicas e /health.
 
     A ``SECRET_KEY`` das sessões é derivada da master key (domínio de chave
     distinto), nunca a própria master key; sem master key, usa uma chave
@@ -477,9 +343,12 @@ def create_app():
         Settings.SESSION_COOKIE_SECURE.strip().lower() in ("1", "true", "yes")
     )
 
-    # Cabeçalhos de segurança básicos em TODAS as respostas. Não adicionamos CSP
-    # porque os templates injetam JSON inline (__INITIAL_DATA__ etc.); uma CSP
-    # sem 'unsafe-inline' quebraria o painel — fica como pendência.
+    # Cabeçalhos de segurança básicos em TODAS as respostas. A CSP usa
+    # script-src 'self' (sem 'unsafe-inline'): todo o JS é externo, os templates
+    # não injetam mais <script> inline. O domínio do Cloudflare Turnstile é
+    # liberado em script-src e frame-src (o widget roda em iframe da Cloudflare).
+    # Mantemos 'unsafe-inline' em style-src porque os templates usam atributos
+    # style dinâmicos (cores das células/badges) — style não executa código.
     @app.after_request
     def _security_headers(resposta):
         """Aplica cabeçalhos de segurança a toda resposta."""
@@ -488,17 +357,24 @@ def create_app():
             "Referrer-Policy", "strict-origin-when-cross-origin"
         )
         resposta.headers.setdefault("X-Frame-Options", "DENY")
+        resposta.headers.setdefault(
+            "Content-Security-Policy",
+            "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+        )
         return resposta
-
-    def _render(autenticado, **extra):
-        """Renderiza o template passando o token CSRF da sessão."""
-        contexto = {"autenticado": autenticado, "csrf_token": _csrf_atual()}
-        contexto.update(extra)
-        return render_template("config.html", **contexto)
 
     @app.get("/health")
     def health():
-        """Reporta a saúde do monitor: banco, scheduler e última coleta."""
+        """Reporta a saúde do monitor e devolve 503 quando há falha crítica.
+
+        O status é ``ok`` (HTTP 200) somente com banco acessível E scheduler
+        ativo; qualquer um dos dois em falha resulta em ``erro`` (HTTP 503).
+
+        Returns:
+            Resposta JSON com ``status``, ``banco``, ``scheduler``,
+            ``ultima_coleta`` e ``leituras_total``, com o código HTTP
+            correspondente ao estado.
+        """
         banco = "ok"
         leituras_total = 0
         ultima_coleta = None
@@ -513,15 +389,20 @@ def create_app():
             banco = "erro"
             logger.error("Falha ao consultar o banco em /health: %s", exc)
 
+        ativo = scheduler_ativo()
+        # 503 com scheduler inativo é intencional: em produção via wsgi o
+        # scheduler é obrigatório; em testes/import sem bootstrap o endpoint
+        # reporta erro para um monitor de disponibilidade detectar.
+        saudavel = banco == "ok" and ativo
         return jsonify(
             {
-                "status": "ok",
+                "status": "ok" if saudavel else "erro",
                 "banco": banco,
-                "scheduler": "ativo" if scheduler_ativo() else "inativo",
+                "scheduler": "ativo" if ativo else "inativo",
                 "ultima_coleta": ultima_coleta,
                 "leituras_total": leituras_total,
             }
-        )
+        ), (200 if saudavel else 503)
 
     @app.get("/")
     def index():
@@ -534,6 +415,7 @@ def create_app():
             modelos=[{"codigo": m["codigo"], "nome": m["nome"]} for m in modelos],
             ambientes=_AMBIENTES,
             gerado_em=datetime.now(timezone.utc).isoformat(),
+            turnstile_site_key=Settings.TURNSTILE_SITE_KEY,
         )
 
     @app.get("/llms.txt")
@@ -565,9 +447,24 @@ def create_app():
         """Renderiza a página de termos de uso."""
         return render_template("termos.html")
 
+    @app.get("/faq")
+    def faq():
+        """Renderiza a página de perguntas frequentes (FAQ)."""
+        return render_template("faq.html")
+
     @app.get("/api/status")
     def api_status():
         """Devolve o estado atual das células para o polling do dashboard."""
+        ip = _ip_cliente()
+        if not _RL_API.consome(ip):
+            resposta = jsonify(
+                {"erro": "Limite de requisições excedido. Tente novamente em instantes."}
+            )
+            resposta.headers["Retry-After"] = "60"
+            return resposta, 429
+        ok, msg = _turnstile_ok()
+        if not ok:
+            return jsonify({"erro": msg}), 403
         return jsonify(
             {
                 "gerado_em": datetime.now(timezone.utc).isoformat(),
@@ -622,11 +519,23 @@ def create_app():
             uptime_pct=historico["uptime_pct"],
             documentos=[{"codigo": m["codigo"], "nome": m["nome"]} for m in modelos],
             ambientes=_AMBIENTES,
+            turnstile_site_key=Settings.TURNSTILE_SITE_KEY,
         )
 
     @app.get("/api/uf/<uf>/historico")
     def api_uf_historico(uf):
         """Devolve a série histórica de uma UF (uptime e sparkline)."""
+        ip = _ip_cliente()
+        if not _RL_API.consome(ip):
+            resposta = jsonify(
+                {"erro": "Limite de requisições excedido. Tente novamente em instantes."}
+            )
+            resposta.headers["Retry-After"] = "60"
+            return resposta, 429
+        ok, msg = _turnstile_ok()
+        if not ok:
+            return jsonify({"erro": msg}), 403
+
         uf_norm = (uf or "").strip().upper()
         if uf_norm not in Settings.lista_ufs():
             return jsonify({"erro": "UF inválida."}), 404
@@ -640,9 +549,15 @@ def create_app():
             return jsonify({"erro": "Parâmetro 'horas' deve estar entre 1 e 720."}), 400
 
         modelos = config.modelos_ativos_dfe()
+        codigos = [m["codigo"] for m in modelos]
+        informado = request.args.get("documento")
+        # Quando o documento é INFORMADO na query, exige que seja um modelo
+        # ativo conhecido (400 se não for); ausente continua caindo no
+        # primeiro modelo ativo.
+        if informado and informado.strip().lower() not in codigos:
+            return jsonify({"erro": "Documento inválido."}), 400
         documento = (
-            request.args.get("documento")
-            or (modelos[0]["codigo"] if modelos else "")
+            informado or (modelos[0]["codigo"] if modelos else "")
         ).strip().lower()
 
         bruto_amb = request.args.get("tp_amb", "1")
@@ -666,73 +581,31 @@ def create_app():
             }
         )
 
-    @app.get("/config")
-    def config_pagina():
-        """Mostra o formulário de login ou o painel de configurações."""
-        if not _autenticado():
-            return _render(False)
-        return _render(True, filtros=_filtros_atuais())
-
-    @app.post("/config/login")
-    def config_login():
-        """Valida o CSRF, o rate limit e a senha; abre a sessão em caso de sucesso."""
-        if not _csrf_valido():
-            logger.warning(
-                "POST /config/login sem CSRF válido (ip=%s).", request.remote_addr
-            )
-            return _render(False, erro="Requisição inválida."), 400
-
-        ip = _ip_cliente()
-        if not _login_permitido(ip):
-            logger.warning("Rate limit de login excedido (ip=%s).", ip)
-            return _render(
-                False, erro="Muitas tentativas. Tente novamente em instantes."
-            ), 429
-
-        # Contabiliza ANTES de verificar a senha: assim tentativas repetidas não
-        # forçam derivação PBKDF2 (custo alto) além do limite.
-        _registrar_tentativa(ip)
-
-        senha = request.form.get("senha", "")
-        hash_armazenado = config.buscar_configuracao("admin_senha_hash")
-        if not hash_armazenado:
-            logger.warning(
-                "Login sem admin_senha_hash; rode src/scripts/configurar.py."
-            )
-            return _render(False, erro="Acesso indisponível."), 400
-        if segredos.verificar_senha(senha, hash_armazenado):
-            session["admin_autenticado"] = True
-            return redirect(url_for("config_pagina"))
-        return _render(False, erro="Senha inválida."), 401
-
-    @app.post("/config/logout")
-    def config_logout():
-        """Encerra a sessão do admin (somente POST)."""
-        session.clear()
-        return redirect(url_for("config_pagina"))
-
-    @app.post("/config/salvar")
-    def config_salvar():
-        """Valida e grava os filtros operacionais enviados pelo painel."""
-        if not _csrf_valido():
-            logger.warning(
-                "POST /config/salvar sem CSRF válido (ip=%s).", request.remote_addr
-            )
-            return _render(False, erro="Requisição inválida."), 400
-        if not _autenticado():
-            return redirect(url_for("config_pagina"))
-
-        valores, erro_validacao = _validar_filtros(request.form)
-        if erro_validacao:
-            flash(erro_validacao, "erro")
-            return redirect(url_for("config_pagina"))
-
-        for chave, valor in (valores or {}).items():
-            config.definir_configuracao(chave, valor)
-        flash("Configurações salvas.", "sucesso")
-        return redirect(url_for("config_pagina"))
-
     return app
+
+
+def iniciar_scheduler():
+    """Cria, agenda e inicia o scheduler de coleta/retensão (idempotente).
+
+    O scheduler roda **dentro do processo** da aplicação — por isso o gunicorn
+    deve subir com exatamente 1 worker (múltiplos workers disparariam coletas
+    duplicadas). O endpoint ``/health`` depende dele estar ativo para reportar
+    ``status: ok``.
+
+    Returns:
+        Instância de ``BackgroundScheduler`` em execução; se já houver uma ativa
+        neste processo, devolve a existente sem criar outra.
+    """
+    global _scheduler
+    if _scheduler is not None and getattr(_scheduler, "running", False):
+        return _scheduler
+    scheduler = BackgroundScheduler(timezone=timezone.utc)
+    coletar.agendar(scheduler)
+    reter.agendar(scheduler)
+    backup.agendar(scheduler)
+    scheduler.start()
+    _scheduler = scheduler
+    return scheduler
 
 
 if __name__ == "__main__":
@@ -744,12 +617,17 @@ if __name__ == "__main__":
         criar_schema(conn)
 
     app = create_app()
-    scheduler = BackgroundScheduler(timezone=timezone.utc)
-    coletar.agendar(scheduler)
-    reter.agendar(scheduler)
-    scheduler.start()
-    _scheduler = scheduler
+    iniciar_scheduler()
 
+    # host 0.0.0.0 permite servir direto numa VPS/container, sem proxy reverso;
+    # a porta vem de config.json (default 5628). O aviso do werkzeug (dev server)
+    # é aceitável para uso leve; produção maior deve usar o caminho avançado
+    # (gunicorn + nginx, em public/docs/deploy.md).
     # use_reloader=False: o reloader do Flask sobe o processo duas vezes; com
     # ele ligado o APScheduler dispararia cada job em duplicidade.
-    app.run(debug=False, use_reloader=False)
+    app.run(
+        host="0.0.0.0",
+        port=config.porta_web(),
+        debug=False,
+        use_reloader=False,
+    )

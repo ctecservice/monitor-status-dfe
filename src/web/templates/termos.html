@@ -18,7 +18,8 @@
       </a>
       <nav class="topbar__nav" aria-label="Navegação principal">
         <a class="topbar__link" href="{{ url_for('index') }}">Painel</a>
-        <a class="topbar__link" href="{{ url_for('config_pagina') }}">Configurações</a>
+        <a class="topbar__link" href="{{ url_for('faq') }}">FAQ</a>
+        <a class="topbar__link" href="https://github.com/ctecservice/monitor-status-dfe" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </div>
   </header>
@@ -28,6 +29,7 @@
       <a class="backlink" href="{{ url_for('index') }}">← Voltar ao painel</a>
 
       <header class="prose__header">
+        <span class="hero__eyebrow">Legal</span>
         <h1 class="prose__title">Termos de uso</h1>
         <p class="prose__lead">
           Estes termos regem o uso do Monitor Status DFe (o "serviço"), uma aplicação
@@ -69,6 +71,12 @@
           infraestrutura, sem tentar burlar mecanismos de segurança, sem comprometer a
           integridade do serviço e sem utilizá-lo para finalidades ilícitas.
         </p>
+        <p>
+          Para proteger o serviço contra abuso automatizado, podem ser aplicados limites
+          de acesso por endereço IP e um mecanismo de verificação anti-robô (Cloudflare
+          Turnstile). Esse mecanismo pode processar dados técnicos mínimos da sua conexão,
+          conforme a política de privacidade da Cloudflare.
+        </p>
       </section>
 
       <section id="proibicoes">
@@ -94,8 +102,9 @@
           públicos de status dos serviços SEFAZ, sem dados pessoais ou fiscais de
           contribuintes. Credenciais de operadores de instalações próprias permanecem sob
           responsabilidade de quem opera cada instalação. Registros técnicos de operação
-          (como tentativas de acesso ao painel administrativo) podem ser mantidos
-          temporariamente em logs locais e são excluídos conforme a retenção configurada.
+          (como tentativas de acesso ao painel administrativo) e de proteção anti-robô
+          podem ser mantidos temporariamente em logs locais e são excluídos conforme a
+          retenção configurada.
         </p>
       </section>
 
@@ -112,7 +121,8 @@
         <h2>7. Contato</h2>
         <p>
           Dúvidas sobre estes termos podem ser encaminhadas pelos canais oficiais do
-          projeto em <a href="https://dadosjah.com.br" target="_blank" rel="noopener">dadosjah.com.br</a>.
+          projeto em <a href="https://dadosjah.com.br" target="_blank" rel="noopener">dadosjah.com.br</a>
+          ou <a href="https://ctec.com.br/" target="_blank" rel="noopener">ctec.com.br</a>.
         </p>
       </section>
     </article>
@@ -120,7 +130,10 @@
 
   <footer class="footer" role="contentinfo">
     <div class="footer__inner">
-      <span class="footer__texto">Monitor Status DFe · DadosJah</span>
+      <div class="footer__info">
+        <span class="footer__texto">Monitor Status DFe · DadosJah</span>
+        <span class="footer__creditos">Projeto open-source (MIT) · Desenvolvido e mantido pela <a class="footer__link" href="https://ctec.com.br/" target="_blank" rel="noopener">CTEC</a></span>
+      </div>
       <a class="footer__logo-link" href="https://dadosjah.com.br" target="_blank" rel="noopener">
         <img class="footer__logo"
              src="{{ url_for('static', filename='logos/logo-horizontal-escuro-2400x800.png') }}"

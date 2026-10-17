@@ -114,6 +114,40 @@ def obter_token(forcar=False):
     return token
 
 
+def encerrar_sessao(token):
+    """Faz o logout na API e descarta o cache de token.
+
+    Usada pelo motor ao final de cada ciclo de coleta. Falhas de rede ou
+    respostas de erro **não** propagam exceção (apenas log de aviso): o
+    objetivo é garantir memória limpa, não interromper o encerramento.
+
+    Args:
+        token: accessToken a revogar. Se vazio, apenas limpa o cache.
+
+    Returns:
+        None.
+    """
+    if token:
+        url = f"{Settings.API_BASE_URL}/v1/auth/user/logout"
+        try:
+            with httpx.Client(timeout=Settings.API_TIMEOUT_S) as client:
+                resposta = client.post(
+                    url, headers={"Authorization": f"Bearer {token}"}
+                )
+            if resposta.status_code not in (200, 201, 204):
+                logger.warning(
+                    "Logout na API retornou HTTP %s.", resposta.status_code
+                )
+        except httpx.TimeoutException:
+            logger.warning("Timeout ao encerrar sessão na API.")
+        except httpx.HTTPError as exc:
+            logger.warning("Erro de rede ao encerrar sessão na API: %s", exc)
+
+    _TOKEN_CACHE["token"] = None
+    _TOKEN_CACHE["expira_em"] = None
+    logger.info("Sessão da API encerrada e cache de token limpo.")
+
+
 if __name__ == "__main__":
     from src.utils.logger import configurar_logger
     from src.utils.settings import carregar_env

@@ -13,8 +13,10 @@ semaforo e historico.
 
 ## Como funciona
 
-1. Coleta periodica: um job consulta a API DadosJah por UF x modelo x ambiente,
-   autenticando com login (email/senha) e usando o access token JWT.
+1. Coleta periodica: um job consulta a API de consulta por UF x modelo x ambiente,
+   autenticando com login (email/senha) no inicio do ciclo e usando o access token
+   JWT em todas as consultas do ciclo (logout ao final). A integracao e modular:
+   a API ativa e escolhida em config.json (coleta.motor).
 2. Classificacao: o cStat da SEFAZ vira um estado (107 operacional, 108 instavel,
    109 indisponivel; erro/timeout = sem dados).
 3. Exibicao: grade semaforo no painel e historico persistido em SQLite para
@@ -26,11 +28,11 @@ semaforo e historico.
 |---|---|---|
 | / | pagina | Painel com grade UF x modelo |
 | /uf/<uf> | pagina | Detalhe por UF (ultimo status, uptime, latencia) |
-| /api/status | JSON | Estado atual das celulas (polling 60 s) |
-| /api/uf/<uf>/historico | JSON | Serie historica (uptime + sparkline) |
-| /health | JSON | Saude do monitor |
-| /config | pagina | Configuracao (protegida por senha) |
+| /api/status | JSON | Estado atual das celulas (polling 60 s; rate limit por IP, 429; Turnstile opcional) |
+| /api/uf/<uf>/historico | JSON | Serie historica (uptime + sparkline; rate limit por IP, 429; Turnstile opcional) |
+| /health | JSON | Saude do monitor (200 ok; 503 quando banco/scheduler falham) |
 | /termos | pagina | Termos de uso |
+| /faq | pagina | Perguntas frequentes |
 | /llms.txt | texto | Este guia para agentes de IA |
 | /robots.txt | texto | Politica de crawlers |
 | /sitemap.xml | XML | Paginas estaticas do site |
@@ -38,10 +40,28 @@ semaforo e historico.
 ## Execucao
 
 1. Execute criar-venv.bat para criar o ambiente virtual.
-2. Copie .env.example para .env.
-3. Preencha API_LOGIN_USUARIO e API_LOGIN_SENHA no .env.
-4. Rode src/scripts/configurar.py (gera a master key e a senha do admin).
+2. Copie .env.example para .env e config.example.json para config.json.
+3. Preencha API_LOGIN_USUARIO e API_LOGIN_SENHA no .env; ajuste as
+   configuracoes operacionais (UFs, modelos, intervalo, retencoes, porta,
+   rate limit, links) no config.json.
+4. Rode src/scripts/configurar.py (gera a master key).
 5. Inicie com: python src/app.py
+
+## Configuracao
+
+- config.json (raiz): configuracoes operacionais. Chaves: coleta
+  (ufs_monitoradas, modelos_ativos, intervalo_min, timeout_s, motor),
+  retencao (dados_dias, logs_dias), web (porta), rate_limit
+  (api_requisicoes_por_minuto) e links (github, ctec). Alteracoes exigem
+  restart do processo.
+- .env: segredos e credenciais (API_BASE_URL, API_TIMEOUT_S, API_LOGIN_*,
+  MONITOR_MASTER_KEY, SESSION_COOKIE_SECURE, UFS, TP_AMBS, BANCO_CAMINHO,
+  LOG_NIVEL, TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY).
+- Nao ha painel web de configuracao: por decisao de seguranca, tudo e ajustado
+  nos arquivos acima no momento do deploy.
+- APIs publicas tem rate limit por IP (padrao 30 req/min; excedente = 429 com
+  Retry-After: 60) e protecao anti-bot opcional via Cloudflare Turnstile
+  (quando habilitada, exige o header CF-Turnstile-Token; ausente/invalido = 403).
 
 ## Documentacao
 

@@ -1,0 +1,33 @@
+$kind: http-example
+name: Limite de requisições por IP excedido.
+request:
+  url: "{{baseUrl}}/api/status"
+  method: GET
+  headers:
+    - key: CF-Turnstile-Token
+      value: string
+      disabled: false
+      description: |
+        Token do Cloudflare Turnstile. Exigido APENAS quando a proteção anti-bot está habilitada na instalação; sem chaves configuradas, o cabeçalho é ignorado.
+    - key: Accept
+      value: application/json
+  body:
+    type: text
+    content: ""
+response:
+  statusCode: 429
+  statusText: Too Many Requests
+  headers:
+    - key: Retry-After
+      value: "60"
+      disabled: false
+      description: Segundos até poder tentar novamente.
+    - key: Content-Type
+      value: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "erro": "Limite de requisições excedido. Tente novamente em instantes."
+      }
+order: 3000

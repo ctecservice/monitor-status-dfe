@@ -6,6 +6,10 @@
   <title>Painel de status — Monitor Status DFe</title>
   <link rel="icon" href="{{ url_for('static', filename='logos/simbolo.ico') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% if turnstile_site_key %}
+  <meta name="turnstile-site-key" content="{{ turnstile_site_key }}">
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
+  {% endif %}
 </head>
 <body>
   <header class="topbar" role="banner">
@@ -17,25 +21,30 @@
         <span>Monitor Status DFe</span>
       </a>
       <nav class="topbar__nav" aria-label="Navegação principal">
-        <a class="topbar__link" href="{{ url_for('index') }}">Painel</a>
-        <a class="topbar__link" href="{{ url_for('config_pagina') }}">Configurações</a>
+        <a class="topbar__link" href="{{ url_for('index') }}" aria-current="page">Painel</a>
+        <a class="topbar__link" href="{{ url_for('faq') }}">FAQ</a>
+        <a class="topbar__link" href="https://github.com/ctecservice/monitor-status-dfe" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </div>
   </header>
 
   <main>
     <div class="container container--wide">
-      <header class="panel__header">
-        <div class="panel__header-row">
-          <div>
-            <h1 class="panel__title">Painel de status</h1>
-            <p class="panel__desc">
-              Monitor dos serviços SEFAZ. Atualizado a cada 60 segundos.
-              <span class="panel__meta">Gerado em
-                <time id="gerado-em" datetime="{{ gerado_em }}">{{ gerado_em }}</time>
-              </span>
-            </p>
-          </div>
+      <header class="hero">
+        <span class="hero__eyebrow">Monitor público</span>
+        <h1 class="hero__title">Painel de status</h1>
+        <p class="hero__desc">
+          Monitor público dos serviços SEFAZ de emissão de DF-e.
+          Os dados são consultados em uma API e exibidos em uma grade simples:
+          Operacional, Instável, Indisponível e Sem dados.
+        </p>
+
+        <div class="hero__row">
+          <span class="hero__meta">
+            <span class="pulse-dot" aria-hidden="true"></span>
+            Atualizado às
+            <time id="gerado-em" datetime="{{ gerado_em }}">{{ gerado_em }}</time>
+          </span>
 
           <div class="ambiente-toggle" role="tablist" aria-label="Seleção de ambiente">
             {% for amb in ambientes %}
@@ -51,20 +60,20 @@
         </div>
 
         <div class="legenda" aria-label="Legenda de estados">
-          <span class="legenda__item">
-            <span class="legenda__dot" style="background:#22C55E"></span>
+          <span class="legenda__item" style="--pill-cor:#22C55E">
+            <span class="legenda__dot"></span>
             <span class="legenda__label">Operacional</span>
           </span>
-          <span class="legenda__item">
-            <span class="legenda__dot" style="background:#F59E0B"></span>
+          <span class="legenda__item" style="--pill-cor:#F59E0B">
+            <span class="legenda__dot"></span>
             <span class="legenda__label">Instável</span>
           </span>
-          <span class="legenda__item">
-            <span class="legenda__dot" style="background:#EF4444"></span>
+          <span class="legenda__item" style="--pill-cor:#EF4444">
+            <span class="legenda__dot"></span>
             <span class="legenda__label">Indisponível</span>
           </span>
-          <span class="legenda__item">
-            <span class="legenda__dot" style="background:#8A8585"></span>
+          <span class="legenda__item" style="--pill-cor:#8A8585">
+            <span class="legenda__dot"></span>
             <span class="legenda__label">Sem dados</span>
           </span>
         </div>
@@ -100,8 +109,8 @@
                      data-documento="{{ m.codigo }}"
                      href="{{ url_for('uf_detalhe', uf=uf) }}?documento={{ m.codigo }}&tp_amb=1"
                      style="{% if c1 %}--celula-cor:{{ c1.cor }};{% endif %}"
-                     title="{{ c1.estado if c1 else 'Sem dados' }}{% if c1 and c1.t_med is not none %} · {{ c1.t_med }} ms{% endif %}">
-                    <span class="celula__estado">{{ c1.estado if c1 else 'Sem dados' }}</span>
+                     title="{{ c1.rotulo if c1 else 'Sem dados' }}{% if c1 and c1.t_med is not none %} · {{ c1.t_med }} ms{% endif %}">
+                    <span class="celula__estado">{{ c1.rotulo if c1 else 'Sem dados' }}</span>
                     <span class="celula__latencia">{{ c1.t_med if c1 and c1.t_med is not none else '—' }}</span>
                     {% if c1 and c1.cstat %}
                     <span class="celula__cstat">{{ c1.cstat }}</span>
@@ -113,8 +122,8 @@
                      data-documento="{{ m.codigo }}"
                      href="{{ url_for('uf_detalhe', uf=uf) }}?documento={{ m.codigo }}&tp_amb=2"
                      style="{% if c2 %}--celula-cor:{{ c2.cor }};{% endif %}"
-                     title="{{ c2.estado if c2 else 'Sem dados' }}{% if c2 and c2.t_med is not none %} · {{ c2.t_med }} ms{% endif %}">
-                    <span class="celula__estado">{{ c2.estado if c2 else 'Sem dados' }}</span>
+                     title="{{ c2.rotulo if c2 else 'Sem dados' }}{% if c2 and c2.t_med is not none %} · {{ c2.t_med }} ms{% endif %}">
+                    <span class="celula__estado">{{ c2.rotulo if c2 else 'Sem dados' }}</span>
                     <span class="celula__latencia">{{ c2.t_med if c2 and c2.t_med is not none else '—' }}</span>
                     {% if c2 and c2.cstat %}
                     <span class="celula__cstat">{{ c2.cstat }}</span>
@@ -129,8 +138,9 @@
         </div>
       </div>
 
-      <p class="panel__nota">
-        <strong>Sem dados</strong> significa que a fonte não respondeu (API, rede ou certificado).
+      <p class="nota-discreta">
+        <strong>Sem dados</strong> significa que a fonte não respondeu (API, rede ou certificado)
+        ou ainda não há coleta para aquela combinação.
         <strong>Indisponível</strong> indica que o serviço SEFAZ está fora do ar (cStat 109).
       </p>
     </div>
@@ -138,7 +148,10 @@
 
   <footer class="footer" role="contentinfo">
     <div class="footer__inner">
-      <span class="footer__texto">Monitor Status DFe · DadosJah</span>
+      <div class="footer__info">
+        <span class="footer__texto">Monitor Status DFe · DadosJah</span>
+        <span class="footer__creditos">Projeto open-source (MIT) · Desenvolvido e mantido pela <a class="footer__link" href="https://ctec.com.br/" target="_blank" rel="noopener">CTEC</a></span>
+      </div>
       <a class="footer__logo-link" href="https://dadosjah.com.br" target="_blank" rel="noopener">
         <img class="footer__logo"
              src="{{ url_for('static', filename='logos/logo-horizontal-escuro-2400x800.png') }}"
@@ -147,13 +160,6 @@
     </div>
   </footer>
 
-  <script>
-    // Dados iniciais injetados pelo Jinja (consumidos por app.js)
-    window.__INITIAL_DATA__ = {
-      celulas: {{ celulas|tojson }},
-      gerado_em: {{ gerado_em|tojson }}
-    };
-  </script>
   <script src="{{ url_for('static', filename='js/app.js') }}" defer></script>
 </body>
 </html>

@@ -1,19 +1,48 @@
 # API JSON
 
-O Monitor Status DFe expõe duas APIs JSON públicas, usadas pelo próprio painel e disponíveis para integração. Todas as respostas são em UTF-8 e no formato JSON.
+O Monitor Status DFe expõe duas APIs JSON públicas, usadas pelo próprio painel e disponíveis para integração, além do endpoint de saúde. Todas as respostas são em UTF-8 e no formato JSON.
+
+## Endpoints públicos
+
+| Endpoint | Descrição |
+|---|---|
+| `GET /api/status` | Estado atual de todas as células do painel |
+| `GET /api/uf/<uf>/historico` | Série histórica de uma UF |
+| `GET /health` | Saúde do monitor (sem rate limit nem anti-robô) |
+
+## Limite de requisições (rate limit)
+
+As rotas `/api/status` e `/api/uf/<uf>/historico` aplicam um limite por endereço IP, com janela de um minuto. O valor padrão é **30 requisições por minuto** e pode ser ajustado em `config.json`, na chave `rate_limit.api_requisicoes_por_minuto`.
+
+Ao exceder o limite, a resposta é:
+
+- status HTTP **`429`**;
+- cabeçalho **`Retry-After: 60`**;
+- corpo `{ "erro": "Limite de requisições excedido. Tente novamente em instantes." }`.
+
+## Proteção anti-robô (Cloudflare Turnstile)
+
+De forma **opcional**, as duas rotas de dados podem exigir uma verificação anti-robô via Cloudflare Turnstile. A proteção é habilitada quando as chaves `TURNSTILE_SITE_KEY` e `TURNSTILE_SECRET_KEY` estão preenchidas no `.env`; sem elas, fica **desligada**.
+
+Quando habilitada, a requisição deve enviar o token do widget no cabeçalho **`CF-Turnstile-Token`**. Se o cabeçalho estiver ausente ou o token for inválido, a resposta é:
+
+- status HTTP **`403`**;
+- corpo `{ "erro": "Verificação anti-bot ausente." }` ou `{ "erro": "Verificação anti-bot falhou." }`.
+
+O endpoint `/health` não está sujeito a rate limit nem à verificação anti-robô.
 
 ## Estados e cores
 
 As APIs usam os seguintes estados e cores de semáforo:
 
-| Estado | Valor | Cor |
-|---|---|---|
-| Operacional | `operacional` | `#22C55E` (verde) |
-| Instável | `instavel` | `#F59E0B` (amarelo) |
-| Indisponível | `indisponivel` | `#EF4444` (vermelho) |
-| Sem dados | `sem_dados` | `#8A8585` (cinza) |
+| Estado | Valor | Rótulo exibível | Cor |
+|---|---|---|---|
+| Operacional | `operacional` | `Operacional` | `#22C55E` (verde) |
+| Instável | `instavel` | `Instável` | `#F59E0B` (amarelo) |
+| Indisponível | `indisponivel` | `Indisponível` | `#EF4444` (vermelho) |
+| Sem dados | `sem_dados` | `Sem dados` | `#8A8585` (cinza) |
 
-O estado é derivado do código de status (`cStat`) devolvido pela SEFAZ: `107` → operacional, `108` → instável, `109` → indisponível. Qualquer outro valor — ou uma falha de coleta (timeout, rede, HTTP diferente de 200) — resulta em `sem_dados`.
+O estado é derivado do código de status (`cStat`) devolvido pela SEFAZ: `107` → operacional, `108` → instável, `109` → indisponível. Qualquer outro valor — ou uma falha de coleta (timeout, rede, HTTP diferente de 200) — resulta em `sem_dados`. O campo `rotulo` traz o estado pronto para exibição (com acentuação correta).
 
 Campos `cstat`, `t_med` e `response_time` podem ser `null` quando não há dado.
 
@@ -42,6 +71,7 @@ GET /api/status
       "documento": "nfe",
       "tp_amb": 1,
       "estado": "operacional",
+      "rotulo": "Operacional",
       "cor": "#22C55E",
       "cstat": "107",
       "t_med": 320,
@@ -64,6 +94,7 @@ GET /api/status
 | `celulas[].documento` | string | Código do documento (ex.: `nfe`) |
 | `celulas[].tp_amb` | número | Ambiente (1 = produção, 2 = homologação) |
 | `celulas[].estado` | string | Estado do semáforo |
+| `celulas[].rotulo` | string | Rótulo exibível do estado (ex.: `Operacional`, `Instável`, `Indisponível`, `Sem dados`) |
 | `celulas[].cor` | string | Cor hexadecimal do estado |
 | `celulas[].cstat` | string ou null | Código de status da SEFAZ |
 | `celulas[].t_med` | número ou null | Tempo médio do serviço informado pela SEFAZ (ms) |
@@ -114,6 +145,7 @@ GET /api/uf/MG/historico?documento=nfe&tp_amb=1&horas=24
     "documento": "nfe",
     "tp_amb": 1,
     "estado": "operacional",
+    "rotulo": "Operacional",
     "cor": "#22C55E",
     "cstat": "107",
     "t_med": 320,
@@ -151,12 +183,14 @@ GET /api/uf/MG/historico?documento=nfe&tp_amb=1&horas=24
 | `ultimo.ver_aplic` | string ou null | Versão da aplicação da SEFAZ |
 | `ultimo.dh_recebto` | string ou null | Data/hora de recebimento informada pela SEFAZ |
 
-> Quando não há leitura na combinação, `ultimo` ainda é devolvido com `estado` e `cor` iguais a `sem_dados` e os demais campos `null`.
+> Quando não há leitura na combinação, `ultimo` ainda é devolvido com `estado` = `sem_dados`, `rotulo` = `Sem dados`, `cor` = `#8A8585` e os demais campos `null`.
 
 ### Erros
 
 | Situação | Status HTTP | Corpo |
 |---|---|---|
+| Limite de requisições excedido | 429 | `{ "erro": "Limite de requisições excedido. Tente novamente em instantes." }` (com `Retry-After: 60`) |
+| Anti-robô ausente ou inválido (quando habilitado) | 403 | `{ "erro": "Verificação anti-bot ausente." }` ou `{ "erro": "Verificação anti-bot falhou." }` |
 | UF inválida | 404 | `{ "erro": "UF inválida." }` |
 | `horas` não numérico | 400 | `{ "erro": "Parâmetro 'horas' inválido." }` |
 | `horas` fora de 1–720 | 400 | `{ "erro": "Parâmetro 'horas' deve estar entre 1 e 720." }` |
@@ -166,7 +200,7 @@ GET /api/uf/MG/historico?documento=nfe&tp_amb=1&horas=24
 
 ## `GET /health`
 
-Endpoint de saúde do monitor, sem autenticação.
+Endpoint de saúde do monitor, sem autenticação, rate limit ou verificação anti-robô. Devolve **HTTP 200** quando o banco está acessível **e** o agendador está ativo; devolve **HTTP 503** quando qualquer um dos dois está em falha.
 
 ```json
 {
@@ -180,7 +214,7 @@ Endpoint de saúde do monitor, sem autenticação.
 
 | Campo | Tipo | Descrição |
 |---|---|---|
-| `status` | string | `ok` quando o endpoint responde |
+| `status` | string | `ok` (HTTP 200) quando banco e agendador estão saudáveis; `erro` (HTTP 503) caso contrário |
 | `banco` | string | `ok` se o banco respondeu; `erro` em caso de falha |
 | `scheduler` | string | `ativo` quando o agendador está rodando; `inativo` caso contrário |
 | `ultima_coleta` | string ou null | Momento da leitura mais recente |
@@ -190,3 +224,4 @@ Endpoint de saúde do monitor, sem autenticação.
 
 - [Uso do painel](uso.md)
 - [Arquitetura](arquitetura.md)
+- [Especificação OpenAPI](../api/openapi.yaml) e [coleção Postman](../../postman/collections/Monitor%20Status%20DFe%20API/) da API, prontas para importar em ferramentas de integração e teste

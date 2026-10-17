@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Perguntas frequentes — Monitor Status DFe</title>
+  <link rel="icon" href="{{ url_for('static', filename='logos/simbolo.ico') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+  <header class="topbar" role="banner">
+    <div class="topbar__inner">
+      <a class="topbar__brand" href="{{ url_for('index') }}">
+        <img class="topbar__logo"
+             src="{{ url_for('static', filename='logos/simbolo-400x400.png') }}"
+             alt="" width="28" height="28">
+        <span>Monitor Status DFe</span>
+      </a>
+      <nav class="topbar__nav" aria-label="Navegação principal">
+        <a class="topbar__link" href="{{ url_for('index') }}">Painel</a>
+        <a class="topbar__link" href="{{ url_for('faq') }}" aria-current="page">FAQ</a>
+        <a class="topbar__link" href="https://github.com/ctecservice/monitor-status-dfe" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article class="faq">
+      <header class="hero">
+        <span class="hero__eyebrow">Ajuda</span>
+        <h1 class="hero__title">Perguntas frequentes</h1>
+        <p class="hero__desc">
+          Dúvidas comuns sobre o funcionamento do monitor, o projeto open-source
+          e os dados exibidos. Se não encontrar o que procura, abra uma issue no GitHub.
+        </p>
+      </header>
+
+      <section class="faq__secao" aria-labelledby="faq-sobre-site">
+        <h2 class="faq__secao-titulo" id="faq-sobre-site">Sobre o site</h2>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">O que é este monitor?</summary>
+          <div class="faq__resposta">
+            <p>É um painel público e gratuito que exibe o status dos serviços de emissão de documentos fiscais eletrônicos (DF-e) das SEFAZ de cada estado, consultando uma API e apresentando o resultado em uma grade simples: Operacional (verde), Instável (âmbar), Indisponível (vermelho) e Sem dados (cinza).</p>
+          </div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">De quanto em quanto tempo os dados são atualizados?</summary>
+          <div class="faq__resposta">
+            <p>As leituras são feitas por ciclo de coleta (por padrão, a cada 5 minutos) e o painel se renova sozinho a cada 60 segundos, sem precisar recarregar a página.</p>
+          </div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">O que significa cada estado?</summary>
+          <div class="faq__resposta">
+            <p><strong>Operacional:</strong> o serviço respondeu normalmente. <strong>Instável:</strong> respondeu com restrição ou lentidão (cStat 108). <strong>Indisponível:</strong> o serviço está fora do ar (cStat 109). <strong>Sem dados:</strong> a fonte não respondeu (falha de rede, API ou certificado) ou ainda não há coleta para aquela combinação.</p>
+          </div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">O que é o uptime de 24 horas?</summary>
+          <div class="faq__resposta">
+            <p>É o percentual de coletas com estado operacional nas últimas 24 horas. Ele mede a estabilidade do serviço naquele período, não o tempo que o serviço existe.</p>
+          </div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">Por que vejo um aviso de 'fonte indisponível' ou uma verificação anti-robô?</summary>
+          <div class="faq__resposta">
+            <p>Para proteger o serviço contra abuso automatizado, aplicamos limites de acesso por endereço IP e, opcionalmente, uma verificação anti-robô (Cloudflare Turnstile). Usuários normais raramente percebem; bots são bloqueados.</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="faq__secao" aria-labelledby="faq-opensource">
+        <h2 class="faq__secao-titulo" id="faq-opensource">Sobre o projeto open-source</h2>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">Este projeto é open-source?</summary>
+          <div class="faq__resposta">
+            <p>Sim. O código é aberto sob licença MIT e está no GitHub: <a href="https://github.com/ctecservice/monitor-status-dfe" target="_blank" rel="noopener">github.com/ctecservice/monitor-status-dfe</a>. Você pode usar, estudar, modificar e hospedar sua própria cópia.</p>
+          </div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">Posso hospedar o meu próprio monitor?</summary>
+          <div class="faq__resposta">
+            <p>Sim. O projeto foi feito para isso: funciona em uma VPS simples ou container, sem depender de nginx, e as configurações ficam em arquivos locais (config.json e .env).</p>
+          </div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">O monitor só funciona com a API da DadosJah?</summary>
+          <div class="faq__resposta">
+            <p>Não. A integração com a API de consulta é modular (chamamos de "motores"): cada API fica em um arquivo próprio e pode ser adicionada ou removida facilmente.</p>
+          </div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">Como posso contribuir?</summary>
+          <div class="faq__resposta">
+            <p>Com código, correções, traduções ou reportando problemas pelo GitHub. Pull requests são bem-vindos, seguindo as regras descritas no repositório.</p>
+          </div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">Quem desenvolve e mantém o projeto?</summary>
+          <div class="faq__resposta">
+            <p>O projeto é desenvolvido e mantido pela <a href="https://ctec.com.br/" target="_blank" rel="noopener">CTEC</a>.</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="faq__secao" aria-labelledby="faq-dadosjah">
+        <h2 class="faq__secao-titulo" id="faq-dadosjah">Sobre a DadosJah</h2>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">O que é a DadosJah?</summary>
+          <div class="faq__resposta">
+            <p>A DadosJah é a plataforma que fornece a API usada como fonte das consultas deste monitor. Saiba mais em <a href="https://dadosjah.com.br/" target="_blank" rel="noopener">dadosjah.com.br</a>.</p>
+          </div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">Os dados exibidos vêm diretamente das SEFAZ?</summary>
+          <div class="faq__resposta">
+            <p>A DadosJah consulta os serviços oficiais das SEFAZ e expõe o resultado em uma API. Este monitor consome essa API e organiza o histórico e a apresentação.</p>
+          </div>
+        </details>
+      </section>
+
+      <section class="faq__secao" aria-labelledby="faq-sefaz">
+        <h2 class="faq__secao-titulo" id="faq-sefaz">Sobre a SEFAZ</h2>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">O que é cStat?</summary>
+          <div class="faq__resposta">
+            <p>É o código de status retornado pelos serviços das SEFAZ. De forma simplificada: 107 = serviço operacional, 108 = instável, 109 = indisponível.</p>
+          </div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">A SEFAZ caiu — o que eu faço?</summary>
+          <div class="faq__resposta">
+            <p>Não é preciso fazer nada imediato: os serviços fiscais costumam se restabelecer em pouco tempo e a SEFAZ costuma prorrogar prazos em indisponibilidades prolongadas. Em caso de dúvida fiscal, consulte os canais oficiais da SEFAZ do seu estado.</p>
+          </div>
+        </details>
+
+        <details class="faq__item">
+          <summary class="faq__pergunta">Este site é um canal oficial da SEFAZ?</summary>
+          <div class="faq__resposta">
+            <p>Não. Este é um painel informativo independente, mantido pela comunidade. Para informações oficiais, consulte os portais das SEFAZ e da Receita Federal.</p>
+          </div>
+        </details>
+      </section>
+    </article>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="footer__inner">
+      <div class="footer__info">
+        <span class="footer__texto">Monitor Status DFe · DadosJah</span>
+        <span class="footer__creditos">Projeto open-source (MIT) · Desenvolvido e mantido pela <a class="footer__link" href="https://ctec.com.br/" target="_blank" rel="noopener">CTEC</a></span>
+      </div>
+      <a class="footer__logo-link" href="https://dadosjah.com.br" target="_blank" rel="noopener">
+        <img class="footer__logo"
+             src="{{ url_for('static', filename='logos/logo-horizontal-escuro-2400x800.png') }}"
+             alt="DadosJah" height="28">
+      </a>
+    </div>
+  </footer>
+</body>
+</html>
