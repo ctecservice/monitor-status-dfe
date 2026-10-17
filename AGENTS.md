@@ -2,7 +2,7 @@
 
 > Monitor web open-source de status dos servicos SEFAZ (DF-e), alimentado pela API DadosJah.
 > Stack: Python 3.12 + Flask + SQLite + APScheduler + Jinja2 + HTML/CSS/JS vanilla.
-> Local: `D:\Dev\Python\monitor-status-dfe`
+> Local: raiz do repositorio
 
 ## Leitura obrigatoria (ordem para retomar o projeto em uma nova sessao)
 
@@ -74,12 +74,12 @@ Pastas novas devem seguir essa separacao por responsabilidade.
   - `leituras` — historico de status por UF x documento x ambiente
   - `modelos_dfe` — modelos de DFe suportados (extensivel por dados; seed `nfe`)
   - `configuracoes` — filtros operacionais (UFs, modelos, intervalo, timeout, retencoes)
-  - `segredos` — credenciais criptografadas (AES-GCM)
+  - `segredos` — credenciais criptografadas (Fernet: AES-128-CBC + HMAC-SHA256)
 - Retencao de dados e logs por job diario conforme `configuracoes` (`retencao_dados_dias`, `retencao_logs_dias`).
 
 ## Seguranca
 
-- **Master key** (`MONITOR_MASTER_KEY`) no `.env` (nunca versionado); segredos reversiveis (ex.: `api_token`) criptografados na tabela `segredos` (Fernet/AES-GCM com chave derivada por PBKDF2).
+- **Master key** (`MONITOR_MASTER_KEY`) no `.env` (nunca versionado); segredos reversiveis (ex.: `api_token`) criptografados na tabela `segredos` (Fernet: AES-128-CBC + HMAC-SHA256; chave derivada por PBKDF2-HMAC-SHA256 600k).
 - Senha do admin da pagina `/config` armazenada como hash (irreversivel).
 - Nunca logar segredos, nunca expor credenciais em paginas publicas ou no repositorio.
 - `.env.example` documenta as chaves sem valores sensiveis.

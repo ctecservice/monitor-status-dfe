@@ -4,7 +4,7 @@
 Monitor web de status dos servicos SEFAZ (DF-e). Consome a API DadosJah, armazena o historico em SQLite e exibe um dashboard com a grade UF x documento.
 
 ## Design
-- **Raiz do projeto:** `AGENTS.md` (regras de IA), `codemap.md` (este mapa), `.gitignore`, `.env.example`, `requirements.txt` (pins exatos), `criar-venv.bat` / `entrar-venv.bat`.
+- **Raiz do projeto:** `AGENTS.md` (regras de IA), `codemap.md` (este mapa), `.gitignore`, `.env.example`, `requirements.txt` (pins exatos), `criar-venv.bat` / `entrar-venv.bat`, `README.md` (publico), `LICENSE` (MIT), `llms.txt`, `robots.txt`, `sitemap.xml` (servidos por rotas Flask), `public/docs/` (documentacao publica).
 - **Processo unico** (Python 3.12): Flask + APScheduler + SQLite + Jinja2 no mesmo processo, para economia de RAM na VPS.
 - **Sem build tools:** frontend em HTML + CSS puro + JS vanilla.
 
@@ -139,6 +139,27 @@ Interface web: templates Jinja2 e estaticos (CSS, JS, logos).
 
 ## Integration
 - Consome as rotas de `src/app.py` (`/`, `/uf/<uf>`, `/api/status`, `/api/uf/<uf>/historico`) e os estados/cores de `src/services/classificar.py`.
+
+# public/docs/
+
+## Responsibility
+Documentacao publica do projeto (versionada, faz parte do site e do repositorio).
+
+## Design
+- `README.md` — indice da documentacao publica.
+- `uso.md` / `configuracao.md` — uso diario e configuracoes (.env e filtros do /config).
+- `api.md` — referencia das APIs JSON publicas (/api/status, /api/uf/<uf>/historico, /health).
+- `arquitetura.md` — componentes, modelo de dados e decisoes tecnicas.
+- `deploy.md` / `como-executar.md` — hospedagem (gunicorn/systemd/nginx) e execucao local.
+- `termos-uso.md` — fonte dos termos de uso (pagina /termos).
+
+## Flow
+1. Documentacao nova DEVE ser criada aqui (regra do AGENTS.md).
+2. A pagina `/termos` transcreve `termos-uso.md`.
+
+## Integration
+- Referenciada pelo README.md e pelo llms.txt.
+- A pasta `docs/` (interna) NAO e versionada.
 
 # docs/
 

@@ -56,8 +56,9 @@ _CHAVES_FILTROS = (
 _RE_LISTA = re.compile(r"^[A-Za-z,\s]{0,200}$")
 
 # Rate limit de login em memória, por IP: no máximo _LIMITE_LOGIN tentativas em
-# uma janela de _JANELA_LOGIN_S segundos. Serve para 1 worker gunicorn; rate
-# limit por nginx (limit_req) fica para o M5.
+# uma janela de _JANELA_LOGIN_S segundos. Serve para 1 worker gunicorn; o
+# limit_req do nginx (M5) atua como defesa em profundidade, mas o bucket por IP
+# aqui é necessário para o rate limit funcionar corretamente atrás do proxy.
 _LIMITE_LOGIN = 5
 _JANELA_LOGIN_S = 60
 _tentativas_login = {}
@@ -107,6 +108,23 @@ def _csrf_valido():
     return bool(esperado) and hmac.compare_digest(enviado, esperado)
 
 
+def _ip_cliente():
+    """Resolve o IP do cliente, respeitando o proxy local (nginx/gunicorn).
+
+    Atrás do nginx, o gunicorn binda em 127.0.0.1 e todas as requisições chegam
+    com ``remote_addr`` local; nesse caso usamos o ``X-Real-IP`` encaminhado pelo
+    proxy. Só confiamos no header quando o cliente direto é de fato o proxy local
+    (127.0.0.1), evitando spoofing por clientes externos.
+
+    Returns:
+        str com o IP do cliente (ou "desconhecido" se indisponível).
+    """
+    remote = request.remote_addr
+    if remote == "127.0.0.1":
+        return request.headers.get("X-Real-IP") or remote or "desconhecido"
+    return remote or "desconhecido"
+
+
 def _login_permitido(ip):
     """Verifica se o IP ainda pode tentar login na janela corrente.
 
@@ -125,7 +143,12 @@ def _login_permitido(ip):
         for marca in _tentativas_login.get(ip, [])
         if agora - marca < _JANELA_LOGIN_S
     ]
-    _tentativas_login[ip] = marcas
+    if marcas:
+        _tentativas_login[ip] = marcas
+    else:
+        # Sem tentativas válidas na janela: remove a chave para o dicionário não
+        # crescer sem limite com IPs rotativos (CWE-770).
+        _tentativas_login.pop(ip, None)
     return len(marcas) < _LIMITE_LOGIN
 
 
@@ -627,6 +650,8 @@ def create_app():
             tp_amb = int(bruto_amb)
         except (TypeError, ValueError):
             return jsonify({"erro": "Parâmetro 'tp_amb' inválido."}), 400
+        if tp_amb not in (1, 2):
+            return jsonify({"erro": "Parâmetro 'tp_amb' deve ser 1 ou 2."}), 400
 
         historico = _historico_uf(uf_norm, documento, tp_amb, horas)
         return jsonify(
@@ -657,7 +682,7 @@ def create_app():
             )
             return _render(False, erro="Requisição inválida."), 400
 
-        ip = request.remote_addr or "desconhecido"
+        ip = _ip_cliente()
         if not _login_permitido(ip):
             logger.warning("Rate limit de login excedido (ip=%s).", ip)
             return _render(
