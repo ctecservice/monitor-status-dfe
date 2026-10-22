@@ -124,6 +124,25 @@ Os volumes `data/` e `logs/` preservam o banco SQLite e os arquivos de log fora 
 
 ---
 
+## Plataformas PaaS (ex.: botkeep.cloud)
+
+Plataformas que alocam a porta HTTP via ambiente funcionam com o mesmo código: quando a variável `PORT` está definida no ambiente, ela **tem prioridade** sobre `web.porta` do `config.json`.
+
+Procedimento típico (verifique os campos exatos no painel da plataforma):
+
+1. **Fonte do código:** conecte o repositório GitHub (`ctecservice/monitor-status-dfe`) ou envie um ZIP da raiz do projeto (sem `.env`, sem `data/` e sem `logs/`).
+2. **Runtime:** Python 3.12.
+3. **Start command:** `python src/app.py` (caminho simples) ou `gunicorn --workers 1 --bind 0.0.0.0:$PORT wsgi:app` (mais robusto; use exatamente 1 worker).
+4. **Dependências:** a plataforma instala via `requirements.txt` (já na raiz).
+5. **Variáveis de ambiente (segredos no painel, nunca no ZIP):** `API_LOGIN_USUARIO`, `API_LOGIN_SENHA`, `MONITOR_MASTER_KEY` (gere uma com `python -c "import secrets; print(secrets.token_urlsafe(32))"`), e opcionalmente `TURNSTILE_SITE_KEY`/`TURNSTILE_SECRET_KEY` e `SESSION_COOKIE_SECURE=true`.
+6. **Arquivos persistentes:** certifique-se de que `data/` (banco SQLite + backups) e `logs/` fiquem no **storage persistente** da plataforma; sem isso, o histórico é perdido a cada restart.
+
+Confirme no painel que a plataforma expõe a porta HTTP publicamente (routing alocado) e acesse `https://SEU_DOMINIO/health` — deve retornar `"status": "ok"` e `"scheduler": "ativo"`.
+
+> O agendador de coleta (APScheduler) roda dentro do processo da aplicação e não precisa de cron externo. Em plataformas com limite de memória pequeno (ex.: 512 MB), o caminho simples (`python src/app.py`) é suficiente; o gunicorn com 1 worker também cabe.
+
+---
+
 ## TLS (HTTPS) sem nginx
 
 Para servir HTTPS de forma simples, sem instalar um proxy reverso na VPS, o caminho mais direto é colocar um serviço externo **em frente** à porta 5628 — por exemplo, o **Cloudflare** (proxy HTTPS gratuito apontando para o seu domínio). O Cloudflare termina o TLS e repassa a requisição para o servidor.

@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -286,11 +287,21 @@ def motor_ativo():
 
 
 def porta_web():
-    """Porta HTTP configurada em ``web.porta``.
+    """Porta HTTP do servidor web.
+
+    A variável de ambiente ``PORT`` tem prioridade sobre ``web.porta`` do
+    ``config.json``: plataformas PaaS (ex.: botkeep.cloud) alocam a porta via
+    ambiente e ignorariam um valor fixo em arquivo.
 
     Returns:
-        int (padrão 5628).
+        int com a porta (padrão 5628).
     """
+    porta_env = os.environ.get("PORT")
+    if porta_env:
+        try:
+            return int(porta_env)
+        except ValueError:
+            logger.warning("PORT do ambiente é inválido (%r); usando config.json", porta_env)
     return _inteiro("web", "porta")
 
 
