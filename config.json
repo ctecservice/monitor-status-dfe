@@ -1,0 +1,23 @@
+{
+  "coleta": {
+    "ufs_monitoradas": "AC,AL,AP,AM,BA,CE,DF,ES,GO,MA,MT,MS,MG,PA,PB,PR,PE,PI,RJ,RN,RS,RO,RR,SC,SP,SE,TO",
+    "modelos_ativos": "nfe",
+    "intervalo_min": 5,
+    "timeout_s": 20,
+    "motor": "dadosjah"
+  },
+  "retencao": {
+    "dados_dias": 30,
+    "logs_dias": 7
+  },
+  "web": {
+    "porta": 5628
+  },
+  "rate_limit": {
+    "api_requisicoes_por_minuto": 30
+  },
+  "links": {
+    "github": "https://github.com/ctecservice/monitor-status-dfe",
+    "ctec": "https://ctec.com.br/"
+  }
+}

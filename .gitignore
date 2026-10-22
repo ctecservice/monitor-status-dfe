@@ -23,7 +23,6 @@ data/
 # Configuracao local (nunca versionar)
 .env
 .env.local
-config.json
 
 # Estado local do Postman CLI e lixeira local do projeto
 .postman/
