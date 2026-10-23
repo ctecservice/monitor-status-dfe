@@ -26,6 +26,16 @@
     return isNaN(n) ? '—' : n + ' ms';
   }
 
+  // Latência exibida: prioriza o tempo de resposta medido pelo monitor
+  // (response_time, ms) e usa o tempo médio informado pela SEFAZ (t_med, ms)
+  // como alternativa quando a medição não existe.
+  function latenciaDe(d) {
+    if (!d) return null;
+    var v = d.response_time;
+    if (v === null || v === undefined || v === '') v = d.t_med;
+    return (v === null || v === undefined || v === '') ? null : v;
+  }
+
   function fmtDatetime(iso) {
     if (!iso) return '—';
     try {
@@ -203,10 +213,11 @@
     var estadoEl = $('.celula__estado', cel);
     var latEl = $('.celula__latencia', cel);
     if (estadoEl) estadoEl.textContent = dados.rotulo || 'Sem dados';
-    if (latEl) latEl.textContent = fmtMs(dados.t_med);
+    if (latEl) latEl.textContent = fmtMs(latenciaDe(dados));
 
     var partes = [dados.rotulo || 'Sem dados'];
-    if (dados.t_med !== null && dados.t_med !== undefined) partes.push(dados.t_med + ' ms');
+    var lat = latenciaDe(dados);
+    if (lat !== null) partes.push(lat + ' ms');
     if (dados.erro) partes.push(dados.erro);
     else if (dados.cstat) partes.push('cStat ' + dados.cstat);
     cel.setAttribute('title', partes.join(' · '));
@@ -336,8 +347,8 @@
     // Mapeia um ponto para o índice da faixa correspondente
     function faixaDe(p) {
       if (p.estado === 'indisponivel' || p.estado === 'sem_dados') return 0;
-      var v = (p.t_med !== null && p.t_med !== undefined) ? p.t_med : p.response_time;
-      if (v === null || v === undefined) return 0;
+      var v = latenciaDe(p);
+      if (v === null) return 0;
       if (v > 30000) return 1;
       if (v > 5000)  return 2;
       if (v > 2000)  return 3;
@@ -402,7 +413,7 @@
       var faixa = faixaDe(p);
       var cx = n > 1 ? X0 + idx * ((X1 - X0) / (n - 1)) : (X0 + X1) / 2;
       var cy = Y0 + faixa * FAIXA_ALT + FAIXA_ALT / 2;
-      var v = (p.t_med !== null && p.t_med !== undefined) ? p.t_med : p.response_time;
+      var v = latenciaDe(p);
       return {
         i: idx,
         cx: cx,
@@ -516,7 +527,7 @@
       if (campoMotivo) campoMotivo.textContent = ultimo.x_motivo || '—';
       if (campoCstat) campoCstat.textContent = ultimo.cstat || '—';
       if (campoVerAplic) campoVerAplic.textContent = ultimo.ver_aplic || '—';
-      if (campoLatencia) campoLatencia.textContent = fmtMs(ultimo.t_med);
+      if (campoLatencia) campoLatencia.textContent = fmtMs(latenciaDe(ultimo));
       if (campoDhRecebto) campoDhRecebto.textContent = ultimo.dh_recebto || '—';
       if (campoColetadoEm) campoColetadoEm.textContent = fmtDatetime(ultimo.coletado_em);
       if (campoMsg) campoMsg.textContent = ultimo.msg || '—';

@@ -35,6 +35,26 @@ def _int_ou_none(valor):
         return None
 
 
+def _tmed_para_ms(valor):
+    """Converte o TMed da SEFAZ (segundos) para milissegundos inteiros.
+
+    A SEFAZ informa o tempo médio de resposta do serviço em **segundos**
+    (ex.: ``"1"`` ou ``0.432``); o projeto armazena e exibe em ms.
+
+    Args:
+        valor: Valor bruto da API (str, int, float ou None).
+
+    Returns:
+        int (ms) ou None quando ausente/incapaz de converter.
+    """
+    if valor is None or valor == "":
+        return None
+    try:
+        return int(round(float(valor) * 1000))
+    except (TypeError, ValueError):
+        return None
+
+
 def _coletar_uma(conn, motor, modelo, uf, tp_amb, timeout_s, token):
     """Executa uma consulta pelo motor e grava a leitura correspondente.
 
@@ -75,7 +95,7 @@ def _coletar_uma(conn, motor, modelo, uf, tp_amb, timeout_s, token):
             None if dados.get("cStat") is None else str(dados.get("cStat")),
             dados.get("Msg"),
             dados.get("xMotivo"),
-            _int_ou_none(dados.get("TMed")),
+            _tmed_para_ms(dados.get("TMed")),
             _int_ou_none(dados.get("response_time") or dados.get("responseTime")),
             dados.get("versao"),
             dados.get("verAplic"),

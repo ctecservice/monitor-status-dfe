@@ -102,6 +102,8 @@
                 {% set cells = celulas | selectattr('uf', 'equalto', uf) | selectattr('documento', 'equalto', m.codigo) | list %}
                 {% set c1 = cells | selectattr('tp_amb', 'equalto', 1) | list | first %}
                 {% set c2 = cells | selectattr('tp_amb', 'equalto', 2) | list | first %}
+                {% set lat1 = c1.response_time if c1 and c1.response_time is not none else (c1.t_med if c1 and c1.t_med is not none else none) %}
+                {% set lat2 = c2.response_time if c2 and c2.response_time is not none else (c2.t_med if c2 and c2.t_med is not none else none) %}
                 <td class="grade__td" data-uf="{{ uf }}" data-documento="{{ m.codigo }}">
                   <a class="celula{% if c1 %} celula--preenchida{% endif %}"
                      data-tp-amb="1"
@@ -109,9 +111,9 @@
                      data-documento="{{ m.codigo }}"
                      href="{{ url_for('uf_detalhe', uf=uf) }}?documento={{ m.codigo }}&tp_amb=1"
                      style="{% if c1 %}--celula-cor:{{ c1.cor }};{% endif %}"
-                     title="{{ c1.rotulo if c1 else 'Sem dados' }}{% if c1 and c1.t_med is not none %} · {{ c1.t_med }} ms{% endif %}">
+                      title="{{ c1.rotulo if c1 else 'Sem dados' }}{% if lat1 is not none %} · {{ lat1 }} ms{% endif %}">
                     <span class="celula__estado">{{ c1.rotulo if c1 else 'Sem dados' }}</span>
-                    <span class="celula__latencia">{{ c1.t_med if c1 and c1.t_med is not none else '—' }}</span>
+                    <span class="celula__latencia">{{ lat1 if lat1 is not none else '—' }}</span>
                     {% if c1 and c1.cstat %}
                     <span class="celula__cstat">{{ c1.cstat }}</span>
                     {% endif %}
@@ -122,9 +124,9 @@
                      data-documento="{{ m.codigo }}"
                      href="{{ url_for('uf_detalhe', uf=uf) }}?documento={{ m.codigo }}&tp_amb=2"
                      style="{% if c2 %}--celula-cor:{{ c2.cor }};{% endif %}"
-                     title="{{ c2.rotulo if c2 else 'Sem dados' }}{% if c2 and c2.t_med is not none %} · {{ c2.t_med }} ms{% endif %}">
+                      title="{{ c2.rotulo if c2 else 'Sem dados' }}{% if lat2 is not none %} · {{ lat2 }} ms{% endif %}">
                     <span class="celula__estado">{{ c2.rotulo if c2 else 'Sem dados' }}</span>
-                    <span class="celula__latencia">{{ c2.t_med if c2 and c2.t_med is not none else '—' }}</span>
+                    <span class="celula__latencia">{{ lat2 if lat2 is not none else '—' }}</span>
                     {% if c2 and c2.cstat %}
                     <span class="celula__cstat">{{ c2.cstat }}</span>
                     {% endif %}

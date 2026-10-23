@@ -1,5 +1,6 @@
 {% set amb_ativo = ambientes | selectattr('tp_amb', 'equalto', tp_amb) | list | first %}
 {% set ambiente_rotulo = amb_ativo.rotulo if amb_ativo else '' %}
+{% set latencia_ultimo = ultimo.response_time if ultimo and ultimo.response_time is not none else (ultimo.t_med if ultimo and ultimo.t_med is not none else none) %}
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -86,7 +87,7 @@
             <div class="status-grid__item">
               <dt>Latência</dt>
               <dd id="campo-latencia">
-                {{ (ultimo.t_med|string + ' ms') if ultimo and ultimo.t_med is not none else '—' }}
+                {{ (latencia_ultimo|string + ' ms') if latencia_ultimo is not none else '—' }}
               </dd>
             </div>
             <div class="status-grid__item">

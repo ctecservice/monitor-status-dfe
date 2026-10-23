@@ -74,8 +74,8 @@ GET /api/status
       "rotulo": "Operacional",
       "cor": "#22C55E",
       "cstat": "107",
-      "t_med": 320,
-      "response_time": 410,
+      "t_med": 1000,
+      "response_time": 672,
       "coletado_em": "2026-10-16T14:05:00+00:00",
       "erro": null
     }
@@ -97,10 +97,12 @@ GET /api/status
 | `celulas[].rotulo` | string | Rótulo exibível do estado (ex.: `Operacional`, `Instável`, `Indisponível`, `Sem dados`) |
 | `celulas[].cor` | string | Cor hexadecimal do estado |
 | `celulas[].cstat` | string ou null | Código de status da SEFAZ |
-| `celulas[].t_med` | número ou null | Tempo médio do serviço informado pela SEFAZ (ms) |
-| `celulas[].response_time` | número ou null | Tempo de resposta medido pelo monitor (ms) |
+| `celulas[].t_med` | número ou null | Tempo médio do serviço informado pela SEFAZ (`TMed`), convertido de segundos para ms |
+| `celulas[].response_time` | número ou null | Tempo de resposta da consulta medido pelo monitor (ms) |
 | `celulas[].coletado_em` | string (ISO 8601) | Momento da coleta |
 | `celulas[].erro` | string ou null | Mensagem de erro da coleta, quando houver |
+
+> O painel exibe como latência da célula o `response_time` (tempo real da consulta); quando ele não existe, usa `t_med` como alternativa.
 
 ---
 
@@ -134,8 +136,8 @@ GET /api/uf/MG/historico?documento=nfe&tp_amb=1&horas=24
       "cstat": "107",
       "estado": "operacional",
       "cor": "#22C55E",
-      "t_med": 305,
-      "response_time": 388,
+      "t_med": 1000,
+      "response_time": 645,
       "erro": null
     }
   ],
@@ -148,8 +150,8 @@ GET /api/uf/MG/historico?documento=nfe&tp_amb=1&horas=24
     "rotulo": "Operacional",
     "cor": "#22C55E",
     "cstat": "107",
-    "t_med": 320,
-    "response_time": 410,
+    "t_med": 1000,
+    "response_time": 672,
     "coletado_em": "2026-10-16T14:05:00+00:00",
     "erro": null,
     "msg": null,
@@ -173,8 +175,8 @@ GET /api/uf/MG/historico?documento=nfe&tp_amb=1&horas=24
 | `pontos[].cstat` | string ou null | Código de status |
 | `pontos[].estado` | string | Estado do semáforo |
 | `pontos[].cor` | string | Cor hexadecimal do estado |
-| `pontos[].t_med` | número ou null | Tempo médio do serviço (ms) |
-| `pontos[].response_time` | número ou null | Tempo de resposta medido (ms) |
+| `pontos[].t_med` | número ou null | Tempo médio do serviço informado pela SEFAZ (`TMed`), convertido de segundos para ms |
+| `pontos[].response_time` | número ou null | Tempo de resposta da consulta medido pelo monitor (ms) |
 | `pontos[].erro` | string ou null | Mensagem de erro, quando houver |
 | `uptime_pct` | número | Percentual de coletas operacionais na janela (1 casa decimal) |
 | `ultimo` | objeto | Último status conhecido; nunca é `null` |
