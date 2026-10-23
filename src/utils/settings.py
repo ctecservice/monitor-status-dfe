@@ -24,6 +24,7 @@ _CHAVES_TEXTO = [
     "TP_AMBS",
     "BANCO_CAMINHO",
     "LOG_NIVEL",
+    "EMBED_ORIGENS",
 ]
 
 
@@ -56,12 +57,28 @@ class Settings:
     # Logs
     LOG_NIVEL = "INFO"
 
+    # Pausa entre consultas do ciclo de coleta (segundos) para respeitar o
+    # rate limit global da API DadosJah (10 req/s e 150 req/min).
+    DELAY_ENTRE_CONSULTAS_S = 0.5
+
+    # Origens autorizadas a incorporar o painel em iframe (modo embed, ?embed=1).
+    # Lista separada por espaços; entra no frame-ancestors da CSP dessa resposta.
+    EMBED_ORIGENS = "https://dadosjah.com.br https://www.dadosjah.com.br"
+
     @classmethod
     def recarregar(cls):
         """Le as variaveis do .env e sincroniza os atributos da classe."""
         for chave in _CHAVES_TEXTO:
             setattr(cls, chave, os.getenv(chave, getattr(cls, chave)))
         cls.API_TIMEOUT_S = int(os.getenv("API_TIMEOUT_S", cls.API_TIMEOUT_S))
+        bruto = os.getenv("DELAY_ENTRE_CONSULTAS_S")
+        if bruto is not None:
+            try:
+                delay = float(bruto)
+                cls.DELAY_ENTRE_CONSULTAS_S = min(max(delay, 0.0), 5.0)
+            except ValueError:
+                # Valor inválido no .env: mantém o padrão (não derruba o app).
+                pass
 
     @classmethod
     def lista_ufs(cls):

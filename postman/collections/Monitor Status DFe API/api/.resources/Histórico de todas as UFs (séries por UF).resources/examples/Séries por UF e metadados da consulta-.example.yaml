@@ -1,0 +1,50 @@
+$kind: http-example
+name: Séries por UF e metadados da consulta.
+request:
+  url: "{{baseUrl}}/api/historico?horas=24&documento=nfe&tp_amb=1"
+  method: GET
+  headers:
+    - key: CF-Turnstile-Token
+      value: string
+      disabled: false
+      description: |
+        Token do Cloudflare Turnstile. Exigido APENAS quando a proteção anti-bot está habilitada na instalação; sem chaves configuradas, o cabeçalho é ignorado.
+    - key: Accept
+      value: application/json
+  queryParams:
+    horas: "24"
+    documento: nfe
+    tp_amb: "1"
+  body:
+    type: text
+    content: ""
+response:
+  statusCode: 200
+  statusText: OK
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "gerado_em": "2026-10-17T13:27:05.481561+00:00",
+        "documento": "nfe",
+        "tp_amb": 1,
+        "horas": 24,
+        "ufs": ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"],
+        "series": {
+          "MG": [
+            {
+              "coletado_em": "2026-10-17T10:00:00+00:00",
+              "cstat": "107",
+              "estado": "operacional",
+              "cor": "#22C55E",
+              "t_med": 512,
+              "response_time": 480,
+              "erro": null
+            }
+          ],
+          "SP": []
+        }
+      }
+order: 1000

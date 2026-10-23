@@ -6,7 +6,14 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from apscheduler.schedulers.background import BackgroundScheduler
-from flask import Flask, Response, jsonify, render_template, request
+from flask import (
+    Flask,
+    Response,
+    jsonify,
+    redirect,
+    request,
+    send_from_directory,
+)
 
 # Permite executar o modulo de qualquer pasta: coloca a raiz do projeto no sys.path
 # (app.py esta em src/ — um nivel abaixo da raiz — por isso parents[1])
@@ -21,11 +28,15 @@ from src.utils.settings import RAIZ_PROJETO, Settings, carregar_env
 
 logger = logging.getLogger("app")
 
-# Ambientes exibidos no dashboard (rótulos exatos consumidos pelo template).
+# Ambientes exibidos no dashboard (rótulos exatos consumidos pelo frontend).
 _AMBIENTES = [
-    {"tp_amb": 1, "rotulo": "Producao"},
-    {"tp_amb": 2, "rotulo": "Homologacao"},
+    {"tp_amb": 1, "rotulo": "Produção"},
+    {"tp_amb": 2, "rotulo": "Homologação"},
 ]
+
+# Fonte única do frontend: a SPA estática vive em frontend/ e é servida tanto
+# pelo Flask (rotas abaixo) quanto pela Vercel (vercel.json, outputDirectory).
+_PASTA_FRONTEND = Path(RAIZ_PROJETO) / "frontend"
 
 # Rate limit das APIs públicas JSON: limite por IP por minuto, em memória —
 # suficiente para 1 worker; o caminho avançado (gunicorn + nginx) pode somar
@@ -108,6 +119,19 @@ def _ultimas_leituras():
             ORDER BY uf, documento, tp_amb
             """
         ).fetchall()
+
+
+def _modelos_ativos():
+    """Lista os modelos ativos no formato público (código e nome).
+
+    Returns:
+        Lista de dicts ``{"codigo", "nome"}`` na ordem de
+        :func:`src.utils.config.modelos_ativos_dfe`.
+    """
+    return [
+        {"codigo": m["codigo"], "nome": m["nome"]}
+        for m in config.modelos_ativos_dfe()
+    ]
 
 
 def _celulas_atuais():
@@ -257,6 +281,68 @@ def _historico_uf(uf, documento, tp_amb, horas):
     }
 
 
+def _historico_geral(documento, tp_amb, horas):
+    """Série histórica de todas as UFs monitoradas numa única consulta.
+
+    Igual a :func:`_historico_uf`, o corte de data é calculado em Python (ISO
+    UTC) e passado como parâmetro — comparar com ``datetime('now')`` do SQLite
+    quebraria por diferença de formato/offset. Uma única query busca todas as
+    UFs e o agrupamento é feito em Python, evitando N+1 por UF.
+
+    Args:
+        documento: Código do modelo (ex.: ``nfe``).
+        tp_amb: Ambiente (1 = produção, 2 = homologação).
+        horas: Tamanho da janela em horas.
+
+    Returns:
+        dict com ``gerado_em``, ``documento``, ``tp_amb``, ``horas``, ``ufs``
+        (todas as UFs monitoradas, na ordem padrão) e ``series`` (chave por UF
+        com a lista de pontos; vazia quando não há leituras na janela).
+    """
+    corte = (datetime.now(timezone.utc) - timedelta(hours=horas)).isoformat()
+    ufs = Settings.lista_ufs()
+    series = {uf: [] for uf in ufs}
+
+    with conexao() as conn:
+        rows = conn.execute(
+            """
+            SELECT uf, coletado_em, cstat, t_med, response_time, erro
+            FROM leituras
+            WHERE documento = ? AND tp_amb = ? AND coletado_em >= ?
+            ORDER BY coletado_em
+            """,
+            (documento, tp_amb, corte),
+        ).fetchall()
+
+    for row in rows:
+        # UFs fora da lista monitorada (config antiga) são ignoradas para manter
+        # o contrato: uma chave por UF de ``ufs`` e nenhuma a mais.
+        pontos = series.get(row["uf"])
+        if pontos is None:
+            continue
+        estado_cor = classificar.classificar(row["cstat"], erro=row["erro"])
+        pontos.append(
+            {
+                "coletado_em": row["coletado_em"],
+                "cstat": row["cstat"],
+                "estado": estado_cor["estado"],
+                "cor": estado_cor["cor"],
+                "t_med": row["t_med"],
+                "response_time": row["response_time"],
+                "erro": row["erro"],
+            }
+        )
+
+    return {
+        "gerado_em": datetime.now(timezone.utc).isoformat(),
+        "documento": documento,
+        "tp_amb": tp_amb,
+        "horas": horas,
+        "ufs": ufs,
+        "series": series,
+    }
+
+
 def _ultimo_vazio(uf, documento, tp_amb):
     """'Último status' neutro (sem_dados) quando não há leitura na combinação.
 
@@ -315,11 +401,7 @@ def create_app():
     Returns:
         Instância de ``flask.Flask``.
     """
-    app = Flask(
-        __name__,
-        template_folder="web/templates",
-        static_folder="web/static",
-    )
+    app = Flask(__name__)
 
     if Settings.MONITOR_MASTER_KEY:
         # Separação de domínios de chave: deriva uma chave dedicada à sessão
@@ -351,16 +433,53 @@ def create_app():
     # style dinâmicos (cores das células/badges) — style não executa código.
     @app.after_request
     def _security_headers(resposta):
-        """Aplica cabeçalhos de segurança a toda resposta."""
+        """Aplica cabeçalhos de segurança a toda resposta.
+
+        Exceção — modo embed (`GET /?embed=1`): o painel pode ser incorporado
+        em iframe por sites parceiros (ex.: dadosjah.com.br). Nesse caso a CSP
+        troca ``frame-ancestors 'none'`` pela lista de ``EMBED_ORIGENS`` e o
+        ``X-Frame-Options`` é removido (a CSP frame-ancestors prevalece nos
+        navegadores modernos e autoriza só as origens listadas).
+        """
         resposta.headers.setdefault("X-Content-Type-Options", "nosniff")
         resposta.headers.setdefault(
             "Referrer-Policy", "strict-origin-when-cross-origin"
         )
+        if request.path in ("/", "/detalhe.html") and request.args.get("embed") == "1":
+            origens = Settings.EMBED_ORIGENS.strip()
+            # Nunca deixar frame-ancestors vazio (invalidaria a CSP inteira):
+            # sem origens autorizadas, o bloqueio de frame continua total.
+            if not origens:
+                origens = "'none'"
+            resposta.headers.pop("X-Frame-Options", None)
+            resposta.headers["Content-Security-Policy"] = (
+                "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; "
+                "style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; "
+                "font-src 'self'; frame-src https://challenges.cloudflare.com; "
+                "object-src 'none'; base-uri 'self'; form-action 'self'; "
+                f"frame-ancestors {origens}"
+            )
+            return resposta
         resposta.headers.setdefault("X-Frame-Options", "DENY")
         resposta.headers.setdefault(
             "Content-Security-Policy",
             "default-src 'self'; script-src 'self' https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; frame-src https://challenges.cloudflare.com; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
         )
+        return resposta
+
+    # CORS aberto em TODAS as respostas (inclusive preflight e erros 403/429):
+    # o frontend estático vive em outro domínio (Vercel) e consome a API
+    # pública. O curinga "*" é aceitável porque a API expõe apenas GET público,
+    # sem cookies/credenciais, protegido por rate limit e Turnstile opcional.
+    @app.after_request
+    def _cors_headers(resposta):
+        """Adiciona os cabeçalhos CORS necessários ao frontend externo."""
+        resposta.headers["Access-Control-Allow-Origin"] = "*"
+        resposta.headers["Access-Control-Allow-Headers"] = (
+            "CF-Turnstile-Token, Content-Type"
+        )
+        resposta.headers["Access-Control-Allow-Methods"] = "GET, OPTIONS"
+        resposta.headers["Access-Control-Max-Age"] = "86400"
         return resposta
 
     @app.get("/health")
@@ -406,17 +525,14 @@ def create_app():
 
     @app.get("/")
     def index():
-        """Renderiza o dashboard (grade UF × modelo × ambiente)."""
-        modelos = config.modelos_ativos_dfe()
-        return render_template(
-            "index.html",
-            celulas=_celulas_atuais(),
-            ufs=config.ufs_monitoradas(),
-            modelos=[{"codigo": m["codigo"], "nome": m["nome"]} for m in modelos],
-            ambientes=_AMBIENTES,
-            gerado_em=datetime.now(timezone.utc).isoformat(),
-            turnstile_site_key=Settings.TURNSTILE_SITE_KEY,
-        )
+        """Serve a SPA estática (frontend/index.html) — fonte única do painel.
+
+        O mesmo diretório é servido pela Vercel (vercel.json aponta para
+        ``frontend/``); aqui o Flask entrega os arquivos para quem roda o
+        caminho simples (``python src/app.py``). Toda a renderização do painel
+        acontece no navegador, consumindo as APIs JSON abaixo.
+        """
+        return send_from_directory(_PASTA_FRONTEND, "index.html")
 
     @app.get("/llms.txt")
     def llms_txt():
@@ -444,17 +560,21 @@ def create_app():
 
     @app.get("/termos")
     def termos():
-        """Renderiza a página de termos de uso."""
-        return render_template("termos.html")
+        """Serve a página de termos de uso (frontend estático, fonte única)."""
+        return send_from_directory(_PASTA_FRONTEND, "termos.html")
 
     @app.get("/faq")
     def faq():
-        """Renderiza a página de perguntas frequentes (FAQ)."""
-        return render_template("faq.html")
+        """Serve a página de perguntas frequentes (frontend estático)."""
+        return send_from_directory(_PASTA_FRONTEND, "faq.html")
 
     @app.get("/api/status")
     def api_status():
-        """Devolve o estado atual das células para o polling do dashboard."""
+        """Devolve o estado atual das células para o polling do dashboard.
+
+        Inclui também ``modelos`` (lista de ``codigo``/``nome`` dos modelos
+        ativos) para o frontend externo montar filtros sem outra chamada.
+        """
         ip = _ip_cliente()
         if not _RL_API.consome(ip):
             resposta = jsonify(
@@ -469,58 +589,79 @@ def create_app():
             {
                 "gerado_em": datetime.now(timezone.utc).isoformat(),
                 "ambientes": _AMBIENTES,
+                "modelos": _modelos_ativos(),
                 "celulas": _celulas_atuais(),
             }
         )
 
+    @app.get("/api/historico")
+    def api_historico():
+        """Devolve as séries históricas de todas as UFs monitoradas.
+
+        Uma única consulta alimenta o gráfico comparativo do frontend externo.
+        Validações e mensagens são idênticas às de ``/api/uf/<uf>/historico``.
+        """
+        ip = _ip_cliente()
+        if not _RL_API.consome(ip):
+            resposta = jsonify(
+                {"erro": "Limite de requisições excedido. Tente novamente em instantes."}
+            )
+            resposta.headers["Retry-After"] = "60"
+            return resposta, 429
+        ok, msg = _turnstile_ok()
+        if not ok:
+            return jsonify({"erro": msg}), 403
+
+        bruto_horas = request.args.get("horas", "24")
+        try:
+            horas = int(bruto_horas)
+        except (TypeError, ValueError):
+            return jsonify({"erro": "Parâmetro 'horas' inválido."}), 400
+        if horas < 1 or horas > 720:
+            return jsonify({"erro": "Parâmetro 'horas' deve estar entre 1 e 720."}), 400
+
+        modelos = config.modelos_ativos_dfe()
+        codigos = [m["codigo"] for m in modelos]
+        informado = request.args.get("documento")
+        if informado and informado.strip().lower() not in codigos:
+            return jsonify({"erro": "Documento inválido."}), 400
+        documento = (
+            informado or (modelos[0]["codigo"] if modelos else "")
+        ).strip().lower()
+
+        bruto_amb = request.args.get("tp_amb", "1")
+        try:
+            tp_amb = int(bruto_amb)
+        except (TypeError, ValueError):
+            return jsonify({"erro": "Parâmetro 'tp_amb' inválido."}), 400
+        if tp_amb not in (1, 2):
+            return jsonify({"erro": "Parâmetro 'tp_amb' deve ser 1 ou 2."}), 400
+
+        return jsonify(_historico_geral(documento, tp_amb, horas))
+
     @app.get("/uf/<uf>")
     def uf_detalhe(uf):
-        """Renderiza a página de detalhe de uma UF.
+        """Redireciona a rota antiga de detalhe para a página estática.
 
-        Lê ``documento`` e ``tp_amb`` da query string com validação defensiva:
-        documento inexistente cai no primeiro modelo ativo; tp_amb fora de 1/2
-        cai em 1.
+        Links legados (favoritos, sitemap, links de terceiros) apontam para
+        ``/uf/<UF>?documento=...&tp_amb=...``; a página estática do frontend é
+        ``detalhe.html`` com ``doc``/``amb`` na query string. Aqui validamos a
+        UF (404 para inválida) e convertemos os parâmetros antigos.
         """
         uf_norm = (uf or "").strip().upper()
         if uf_norm not in Settings.lista_ufs():
             return "UF inválida.", 404
 
-        modelos = config.modelos_ativos_dfe()
-        codigos = [m["codigo"] for m in modelos]
+        parametros = [("uf", uf_norm)]
+        documento = (request.args.get("documento") or "").strip().lower()
+        if documento:
+            parametros.append(("doc", documento))
+        bruto_amb = request.args.get("tp_amb", "").strip()
+        if bruto_amb in ("1", "2"):
+            parametros.append(("amb", bruto_amb))
 
-        # Mesma validação defensiva da rota /api/uf/<uf>/historico: usa o
-        # documento informado (minúsculo) e só cai no primeiro ativo quando
-        # ausente. Assim, um modelo sem dados ainda exibe "sem dados" em vez de
-        # trocar de modelo silenciosamente.
-        documento = (
-            request.args.get("documento") or (codigos[0] if codigos else "")
-        ).strip().lower()
-        modelo_nome = next(
-            (m["nome"] for m in modelos if m["codigo"] == documento),
-            documento.upper() if documento else "",
-        )
-
-        try:
-            tp_amb = int(request.args.get("tp_amb", "1"))
-        except (TypeError, ValueError):
-            tp_amb = 1
-        if tp_amb not in (1, 2):
-            tp_amb = 1
-
-        historico = _historico_uf(uf_norm, documento, tp_amb, 24)
-        return render_template(
-            "detalhe.html",
-            uf=uf_norm,
-            documento=documento,
-            tp_amb=tp_amb,
-            modelo_nome=modelo_nome,
-            ultimo=historico["ultimo"],
-            pontos=historico["pontos"],
-            uptime_pct=historico["uptime_pct"],
-            documentos=[{"codigo": m["codigo"], "nome": m["nome"]} for m in modelos],
-            ambientes=_AMBIENTES,
-            turnstile_site_key=Settings.TURNSTILE_SITE_KEY,
-        )
+        query = "&".join(f"{k}={v}" for k, v in parametros)
+        return redirect(f"/detalhe.html?{query}")
 
     @app.get("/api/uf/<uf>/historico")
     def api_uf_historico(uf):
@@ -580,6 +721,33 @@ def create_app():
                 "ultimo": historico["ultimo"],
             }
         )
+
+    @app.get("/api/openapi.yaml")
+    def api_openapi():
+        """Serve a especificação OpenAPI da API JSON (para Swagger UI/ferramentas).
+
+        Com ``?download=1``, a resposta vem como anexo (``Content-Disposition``),
+        permitindo o botão de download funcionar inclusive de frontends em
+        outros domínios (o atributo ``download`` do HTML só vale same-origin).
+        """
+        pasta = Path(RAIZ_PROJETO) / "public" / "api"
+        if request.args.get("download") == "1":
+            return send_from_directory(
+                pasta,
+                "openapi.yaml",
+                mimetype="text/yaml",
+                as_attachment=True,
+                download_name="openapi.yaml",
+            )
+        return send_from_directory(pasta, "openapi.yaml", mimetype="text/yaml")
+
+    # Assets da SPA (css/js/logos de frontend/). As rotas fixas acima têm
+    # precedência; este catch-all serve o restante, retornando 404 para
+    # arquivos inexistentes (send_from_directory protege contra path traversal).
+    @app.get("/<path:arquivo>")
+    def frontend_assets(arquivo):
+        """Serve os arquivos estáticos do frontend (fonte única)."""
+        return send_from_directory(_PASTA_FRONTEND, arquivo)
 
     return app
 

@@ -1,15 +1,15 @@
 # llms.txt - Monitor Status DFe
 
 Monitor open-source do status dos servicos SEFAZ (DF-e), alimentado pela API
-DadosJah. Coleta periodica, classifica o cStat e exibe um painel com grade
-semaforo e historico.
+DadosJah. Coleta periodica, classifica o cStat e exibe um painel com grade,
+cards e grafico de linha, alem de detalhe por UF.
 
 ## Visao Geral
 
 - O que faz: monitora o status dos servicos SEFAZ (portal nacional DF-e) por UF,
-  modelo de documento e ambiente (producao/homologacao).
-- Stack: Python 3.12 + Flask + SQLite (WAL) + APScheduler + Jinja2 + HTML/CSS/JS
-  vanilla (sem build tools).
+  modelo de documento (NF-e/NFC-e) e ambiente (producao/homologacao).
+- Stack: Python 3.12 + Flask + SQLite (WAL) + APScheduler + frontend estatico
+  HTML/CSS/JS vanilla (sem build tools, sem Jinja).
 
 ## Como funciona
 
@@ -19,23 +19,30 @@ semaforo e historico.
    a API ativa e escolhida em config.json (coleta.motor).
 2. Classificacao: o cStat da SEFAZ vira um estado (107 operacional, 108 instavel,
    109 indisponivel; erro/timeout = sem dados).
-3. Exibicao: grade semaforo no painel e historico persistido em SQLite para
-   uptime e latencia.
+3. Exibicao: frontend estatico em frontend/ (servido pelo Flask na rota / ou
+   publicado separadamente na Vercel/Cloudflare Pages), com historico persistido
+   em SQLite para uptime e latencia.
 
 ## Rotas HTTP
 
 | Rota | Tipo | Descricao |
 |---|---|---|
-| / | pagina | Painel com grade UF x modelo |
-| /uf/<uf> | pagina | Detalhe por UF (ultimo status, uptime, latencia) |
-| /api/status | JSON | Estado atual das celulas (polling 60 s; rate limit por IP, 429; Turnstile opcional) |
-| /api/uf/<uf>/historico | JSON | Serie historica (uptime + sparkline; rate limit por IP, 429; Turnstile opcional) |
-| /health | JSON | Saude do monitor (200 ok; 503 quando banco/scheduler falham) |
-| /termos | pagina | Termos de uso |
+| / | pagina | Painel (grade, cards e grafico de linha; filtros de ambiente e modelo) |
+| /detalhe.html?uf=&doc=&amb= | pagina | Detalhe por UF (ultimo status, uptime, grafico, incidentes, coletas) |
 | /faq | pagina | Perguntas frequentes |
+| /termos | pagina | Termos de uso |
+| /api.html | pagina | Documentacao da API (Swagger UI + colecao Postman) |
+| /api/status | JSON | Estado atual das celulas + lista de modelos (rate limit por IP, 429; Turnstile opcional) |
+| /api/historico | JSON | Series historicas de todas as UFs (rate limit por IP, 429; Turnstile opcional) |
+| /api/uf/<uf>/historico | JSON | Serie historica de uma UF (rate limit por IP, 429; Turnstile opcional) |
+| /api/openapi.yaml | arquivo | Especificacao OpenAPI da API (?download=1 baixa como anexo) |
+| /health | JSON | Saude do monitor (200 ok; 503 quando banco/scheduler falham) |
 | /llms.txt | texto | Este guia para agentes de IA |
 | /robots.txt | texto | Politica de crawlers |
 | /sitemap.xml | XML | Paginas estaticas do site |
+
+Nota: a rota antiga /uf/<uf> ainda existe e redireciona (302) para
+/detalhe.html?uf=..&doc=..&amb=.. (compatibilidade com links antigos).
 
 ## Execucao
 
@@ -43,7 +50,7 @@ semaforo e historico.
 2. Copie .env.example para .env e config.example.json para config.json.
 3. Preencha API_LOGIN_USUARIO e API_LOGIN_SENHA no .env; ajuste as
    configuracoes operacionais (UFs, modelos, intervalo, retencoes, porta,
-   rate limit, links) no config.json.
+   rate limit) no config.json.
 4. Rode src/scripts/configurar.py (gera a master key).
 5. Inicie com: python src/app.py
 
@@ -51,17 +58,20 @@ semaforo e historico.
 
 - config.json (raiz): configuracoes operacionais. Chaves: coleta
   (ufs_monitoradas, modelos_ativos, intervalo_min, timeout_s, motor),
-  retencao (dados_dias, logs_dias), web (porta), rate_limit
-  (api_requisicoes_por_minuto) e links (github, ctec). Alteracoes exigem
-  restart do processo.
+  retencao (dados_dias, logs_dias), web (porta) e rate_limit
+  (api_requisicoes_por_minuto). Alteracoes exigem restart do processo.
 - .env: segredos e credenciais (API_BASE_URL, API_TIMEOUT_S, API_LOGIN_*,
-  MONITOR_MASTER_KEY, SESSION_COOKIE_SECURE, UFS, TP_AMBS, BANCO_CAMINHO,
-  LOG_NIVEL, TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY).
+  MONITOR_MASTER_KEY, SESSION_COOKIE_SECURE, UFS, TP_AMBS,
+  DELAY_ENTRE_CONSULTAS_S, BANCO_CAMINHO, LOG_NIVEL, PORT,
+  TURNSTILE_SITE_KEY, TURNSTILE_SECRET_KEY, EMBED_ORIGENS).
 - Nao ha painel web de configuracao: por decisao de seguranca, tudo e ajustado
   nos arquivos acima no momento do deploy.
 - APIs publicas tem rate limit por IP (padrao 30 req/min; excedente = 429 com
-  Retry-After: 60) e protecao anti-bot opcional via Cloudflare Turnstile
-  (quando habilitada, exige o header CF-Turnstile-Token; ausente/invalido = 403).
+  Retry-After: 60), CORS liberado (frontend pode rodar em outro dominio) e
+  protecao anti-bot opcional via Cloudflare Turnstile (quando habilitada,
+  exige o header CF-Turnstile-Token; ausente/invalido = 403).
+- O painel pode ser incorporado em outras paginas via iframe com /?embed=1
+  (origens autorizadas pela variavel EMBED_ORIGENS do .env).
 
 ## Documentacao
 

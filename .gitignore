@@ -23,6 +23,10 @@ data/
 # Configuracao local (nunca versionar)
 .env
 .env.local
+config.json
+
+# Mapa interno do codigo (artefato de processo; nao vai para o repo publico)
+codemap.md
 
 # Estado local do Postman CLI e lixeira local do projeto
 .postman/

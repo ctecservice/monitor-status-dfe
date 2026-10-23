@@ -46,8 +46,11 @@ O arquivo `.env.example` documenta todas as chaves. Copie-o para `.env` e ajuste
 | `TURNSTILE_SECRET_KEY` | Chave secreta do Cloudflare Turnstile (anti-robô) | *(vazio = desligado)* |
 | `UFS` | UFs monitoradas, separadas por vírgula (padrão de fallback) | todas as 27 UFs |
 | `TP_AMBS` | Ambientes: `1` = produção, `2` = homologação | `1,2` |
+| `DELAY_ENTRE_CONSULTAS_S` | Pausa entre consultas do ciclo de coleta (segundos), para respeitar o rate limit da API de consulta (aceito de 0 a 5) | `0.5` |
 | `BANCO_CAMINHO` | Caminho do arquivo SQLite (relativo à raiz do projeto) | `data/statusdfe.db` |
 | `LOG_NIVEL` | Nível de log: `DEBUG`, `INFO`, `WARNING`, `ERROR` | `INFO` |
+| `PORT` | Porta HTTP — tem prioridade sobre `web.porta` (útil em PaaS) | *(vazio)* |
+| `EMBED_ORIGENS` | Origens autorizadas a incorporar o painel em iframe (`/?embed=1`), separadas por espaço | `https://dadosjah.com.br https://www.dadosjah.com.br` |
 
 > **Onde colocar valores.** As credenciais da API e a chave mestra são segredos e devem ficar apenas no `.env` da instalação. Não os inclua em repositórios, imagens ou páginas públicas.
 >
@@ -62,7 +65,7 @@ Os parâmetros operacionais ficam no `config.json` da raiz do projeto, copiado d
   "_comentario": "Template de config.json. Copie para config.json e ajuste os valores.",
   "coleta": {
     "ufs_monitoradas": "AC,AL,AP,AM,BA,CE,DF,ES,GO,MA,MT,MS,MG,PA,PB,PR,PE,PI,RJ,RN,RS,RO,RR,SC,SP,SE,TO",
-    "modelos_ativos": "nfe",
+    "modelos_ativos": "nfe,nfce",
     "intervalo_min": 5,
     "timeout_s": 20,
     "motor": "dadosjah"
@@ -76,10 +79,6 @@ Os parâmetros operacionais ficam no `config.json` da raiz do projeto, copiado d
   },
   "rate_limit": {
     "api_requisicoes_por_minuto": 30
-  },
-  "links": {
-    "github": "https://github.com/ctecservice/monitor-status-dfe",
-    "ctec": "https://ctec.com.br/"
   }
 }
 ```
@@ -87,7 +86,7 @@ Os parâmetros operacionais ficam no `config.json` da raiz do projeto, copiado d
 | Seção | Chave | Descrição | Padrão |
 |---|---|---|---|
 | `coleta` | `ufs_monitoradas` | UFs a consultar (siglas separadas por vírgula; vazio = usa o `.env`) | todas as 27 UFs |
-| `coleta` | `modelos_ativos` | Modelos de DFe a consultar (vazio = todos os ativos) | `nfe` |
+| `coleta` | `modelos_ativos` | Modelos de DFe a consultar (vazio = todos os ativos) | `nfe,nfce` |
 | `coleta` | `intervalo_min` | Intervalo entre ciclos de coleta, em minutos | `5` |
 | `coleta` | `timeout_s` | Timeout das requisições à API, em segundos | `20` |
 | `coleta` | `motor` | Motor de consulta ativo (ex.: `dadosjah`) | `dadosjah` |
@@ -95,8 +94,6 @@ Os parâmetros operacionais ficam no `config.json` da raiz do projeto, copiado d
 | `retencao` | `logs_dias` | Dias de retenção dos arquivos de log | `7` |
 | `web` | `porta` | Porta HTTP da aplicação | `5628` |
 | `rate_limit` | `api_requisicoes_por_minuto` | Limite de requisições por minuto na API pública | `30` |
-| `links` | `github` | URL do repositório exibida no cabeçalho | repositório oficial |
-| `links` | `ctec` | URL da CTEC exibida no rodapé | `https://ctec.com.br/` |
 
 > **Alterações valem após reiniciar a aplicação.** O `config.json` é lido uma vez, na inicialização do processo, e mantido em memória. Edite o arquivo e reinicie o serviço para aplicar (`python src/app.py` de novo, ou `systemctl restart statusdfe`).
 >

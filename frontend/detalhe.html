@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Detalhe da UF — Monitor Status DFe</title>
+  <link rel="icon" href="assets/logos/simbolo.ico">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body data-page="detalhe">
+  <header class="topbar" role="banner">
+    <div class="topbar__inner">
+      <a class="topbar__brand" href="index.html">
+        <img class="topbar__logo" src="assets/logos/simbolo-400x400.png" alt="" width="28" height="28">
+        <span>Monitor Status DFe</span>
+      </a>
+      <nav class="topbar__nav" aria-label="Navegação principal">
+        <a class="topbar__link" href="faq.html">FAQ</a>
+        <a class="topbar__link" href="api.html">API</a>
+        <a class="topbar__link" href="https://github.com/ctecservice/monitor-status-dfe" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="container">
+      <a class="backlink" href="index.html">← Voltar ao painel</a>
+
+      <!-- Header da UF -->
+      <header class="detalhe__header">
+        <div>
+          <span class="detalhe__eyebrow">UF</span>
+          <h1 class="detalhe__uf" id="detalhe-uf">—</h1>
+          <p class="detalhe__sub">
+            <span id="detalhe-modelo">—</span> · <span id="detalhe-ambiente">—</span>
+          </p>
+        </div>
+        <div class="detalhe__toggles">
+          <div class="ambiente-toggle" role="tablist" aria-label="Seleção de ambiente" id="detalhe-amb-toggle">
+            <button class="ambiente-toggle__btn ambiente-toggle__btn--ativo"
+                    type="button" role="tab" data-tp-amb="1" aria-selected="true">Produção</button>
+            <button class="ambiente-toggle__btn"
+                    type="button" role="tab" data-tp-amb="2" aria-selected="false">Homologação</button>
+          </div>
+          <div class="filtro-modelo" role="tablist" aria-label="Filtro por modelo" id="detalhe-modelo-toggle"></div>
+          <button class="btn-atualizar" id="btn-atualizar-detalhe" type="button" aria-label="Atualizar dados">
+            <svg class="btn-atualizar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 12a9 9 0 01-9 9 9 9 0 01-9-9 9 9 0 019-9c2.5 0 4.8 1 6.5 2.7L21 8"/>
+              <path d="M21 3v5h-5"/>
+            </svg>
+            Atualizar
+          </button>
+        </div>
+      </header>
+
+      <!-- Grid: último status + uptime -->
+      <div class="detalhe__grid">
+        <section class="card" aria-labelledby="card-status">
+          <div class="card__header">
+            <h2 class="card__title" id="card-status">Último status</h2>
+            <p class="card__subtitle">Dados da consulta mais recente.</p>
+          </div>
+          <dl class="status-grid">
+            <div class="status-grid__item">
+              <dt>Estado</dt>
+              <dd id="campo-estado">—</dd>
+            </div>
+            <div class="status-grid__item">
+              <dt>Motivo</dt>
+              <dd id="campo-motivo">—</dd>
+            </div>
+            <div class="status-grid__item">
+              <dt>cStat</dt>
+              <dd id="campo-cstat">—</dd>
+            </div>
+            <div class="status-grid__item">
+              <dt>Aplicação</dt>
+              <dd id="campo-aplicacao">—</dd>
+            </div>
+            <div class="status-grid__item">
+              <dt>Latência</dt>
+              <dd id="campo-latencia">—</dd>
+            </div>
+            <div class="status-grid__item">
+              <dt>Recebido em</dt>
+              <dd id="campo-recebido-em">—</dd>
+            </div>
+            <div class="status-grid__item">
+              <dt>Coletado em</dt>
+              <dd id="campo-coletado-em">—</dd>
+            </div>
+            <div class="status-grid__item">
+              <dt>Mensagem</dt>
+              <dd id="campo-mensagem">—</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="card" aria-labelledby="card-uptime">
+          <div class="card__header">
+            <h2 class="card__title" id="card-uptime">Uptime</h2>
+            <p class="card__subtitle">Percentual de coletas operacionais.</p>
+          </div>
+          <div class="uptime">
+            <div class="uptime__bar">
+              <div class="uptime__fill" id="uptime-fill" style="width: 0%"></div>
+            </div>
+            <div class="uptime__valor">
+              <strong id="uptime-pct">—</strong><span>%</span>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Card: Latência — histórico (gráfico de linha) -->
+      <section class="card" aria-labelledby="card-linha">
+        <div class="card__header">
+          <div class="card__header-row">
+            <div>
+              <h2 class="card__title" id="card-linha">Latência — histórico</h2>
+              <p class="card__subtitle">Latências das coletas na janela selecionada. Cor dos pontos reflete o estado do serviço.</p>
+            </div>
+            <div class="seletor-janela" id="detalhe-janela-sel" role="tablist" aria-label="Janela de tempo">
+              <button class="seletor-janela__btn seletor-janela__btn--ativo"
+                      type="button" role="tab" data-janela="24h" aria-selected="true">24 h</button>
+              <button class="seletor-janela__btn"
+                      type="button" role="tab" data-janela="72h" aria-selected="false">72 h</button>
+              <button class="seletor-janela__btn"
+                      type="button" role="tab" data-janela="7d" aria-selected="false">7 dias</button>
+              <button class="seletor-janela__btn"
+                      type="button" role="tab" data-janela="30d" aria-selected="false">30 dias</button>
+            </div>
+          </div>
+        </div>
+        <div class="linha-chart" id="linha-detalhe"
+             aria-label="Gráfico de latência da UF"></div>
+
+        <!-- Legenda de estados -->
+        <div class="legenda legenda--compact" aria-label="Legenda de estados">
+          <span class="legenda__item" style="--pill-cor:#22C55E">
+            <span class="legenda__dot"></span>
+            <span class="legenda__label">Operacional</span>
+          </span>
+          <span class="legenda__item" style="--pill-cor:#F59E0B">
+            <span class="legenda__dot"></span>
+            <span class="legenda__label">Instável</span>
+          </span>
+          <span class="legenda__item" style="--pill-cor:#EF4444">
+            <span class="legenda__dot"></span>
+            <span class="legenda__label">Indisponível</span>
+          </span>
+          <span class="legenda__item" style="--pill-cor:#8A8585">
+            <span class="legenda__dot"></span>
+            <span class="legenda__label">Sem dados</span>
+          </span>
+        </div>
+
+        <!-- Legenda SLA -->
+        <div class="legenda-sla legenda-sla--explicit">
+          <span class="legenda-sla__rotulo">Latência da consulta:</span>
+          <span class="legenda-sla__item">
+            <span class="legenda-sla__dot" style="background:var(--sla-green)"></span>
+            até 2 s = normal
+          </span>
+          <span class="legenda-sla__item">
+            <span class="legenda-sla__dot" style="background:var(--sla-amber)"></span>
+            2 a 5 s = lenta
+          </span>
+          <span class="legenda-sla__item">
+            <span class="legenda-sla__dot" style="background:var(--sla-red)"></span>
+            acima de 5 s = crítica
+          </span>
+        </div>
+      </section>
+
+      <!-- Card: Incidentes recentes -->
+      <section class="card" aria-labelledby="card-incidentes">
+        <div class="card__header">
+          <h2 class="card__title" id="card-incidentes">Incidentes recentes</h2>
+          <p class="card__subtitle">Períodos contínuos com estado indisponível.</p>
+        </div>
+        <div class="incidents" id="incidents-list"></div>
+      </section>
+
+      <!-- Card: Coletas recentes -->
+      <section class="card" aria-labelledby="card-recentes">
+        <div class="card__header">
+          <div class="recent__header">
+            <div>
+              <h2 class="card__title" id="card-recentes">Coletas recentes</h2>
+              <p class="card__subtitle">Últimas 20 coletas.</p>
+            </div>
+            <div class="recent__actions">
+              <button class="recent__btn" id="btn-export-csv" type="button">Exportar CSV</button>
+              <button class="recent__btn" id="btn-export-json" type="button">Exportar JSON</button>
+            </div>
+          </div>
+        </div>
+        <div id="recent-table"></div>
+      </section>
+
+    </div>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="footer__inner">
+      <div class="footer__info">
+        <span class="footer__texto">Monitor Status DFe · DadosJah</span>
+        <span class="footer__creditos">Projeto open-source (MIT) · Desenvolvido e mantido pela <a class="footer__link" href="https://ctec.com.br/" target="_blank" rel="noopener">CTEC</a></span>
+        <span class="footer__termos"><a class="footer__link" href="termos.html">Termos</a></span>
+      </div>
+      <a class="footer__logo-link" href="https://dadosjah.com.br" target="_blank" rel="noopener">
+        <img class="footer__logo" src="assets/logos/logo-horizontal-escuro-2400x800.png" alt="DadosJah" height="28">
+      </a>
+    </div>
+  </footer>
+
+  <script src="js/config.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

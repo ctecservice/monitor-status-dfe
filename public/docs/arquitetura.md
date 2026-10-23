@@ -47,17 +47,17 @@ Visão em alto nível de como o Monitor Status DFe está organizado e de como um
 
 | Componente | Responsabilidade |
 |---|---|
-| `app.py` | Aplicação Flask: rotas de página, rotas de API JSON, endpoint de saúde e cabeçalhos de segurança. Inicia o agendador e o banco ao subir. |
-| `jobs/` | Tarefas agendadas: `coletar` (ciclo periódico de consulta) e `reter` (limpeza diária de dados e logs). |
+| `app.py` | Aplicação Flask: serve o frontend estático (`frontend/`), rotas de API JSON, especificação OpenAPI, endpoint de saúde e cabeçalhos de segurança. Inicia o agendador e o banco ao subir. |
+| `jobs/` | Tarefas agendadas: `coletar` (ciclo periódico de consulta, com pausa entre consultas para respeitar o rate limit da API), `reter` (limpeza diária de dados e logs) e `backup` (cópia diária do banco). |
 | `motores/` | Motores de consulta — o ponto de extensão multi-API. Cada API de status é um módulo que implementa o contrato `MotorBase` (autenticar, consultar, encerrar). O motor ativo é escolhido em `config.json` (`coleta.motor`). |
-| `services/` | Regras de negócio: classificação do código de status em estado do semáforo. |
+| `services/` | Regras de negócio: classificação do código de status em estado do semáforo, cliente HTTP da API e autenticação. |
 | `utils/` | Utilitários transversais: leitura de configuração (`config.json` e `.env`), conexão e esquema do banco, logging, criptografia de segredos, rate limit e verificação anti-robô. |
-| `web/` | Interface: templates Jinja2 (`templates/`), estilos, JavaScript e logos (`static/`). |
+| `frontend/` | Frontend estático (HTML/CSS/JS vanilla, sem build): painel (`index.html`), detalhe (`detalhe.html`), FAQ, termos e página da API (com Swagger UI). Servido pelo Flask na rota `/` e publicável separadamente (Vercel/Cloudflare Pages). |
 
 ## Configuração
 
-- **`config.json`** (raiz do projeto) — parâmetros operacionais: UFs e modelos monitorados, intervalo, timeout, motor de coleta, retenções, porta HTTP, rate limit e links. É lido uma vez na inicialização e mantido em memória; alterações exigem restart do processo.
-- **`.env`** — segredos e credenciais: URL e credenciais da API, chave mestra, `SESSION_COOKIE_SECURE` e chaves opcionais do Turnstile.
+- **`config.json`** (raiz do projeto) — parâmetros operacionais: UFs e modelos monitorados, intervalo, timeout, motor de coleta, retenções, porta HTTP e rate limit. É lido uma vez na inicialização e mantido em memória; alterações exigem restart do processo.
+- **`.env`** — segredos e credenciais: URL e credenciais da API, chave mestra, `SESSION_COOKIE_SECURE`, chaves opcionais do Turnstile, `DELAY_ENTRE_CONSULTAS_S` (pausa entre consultas), `EMBED_ORIGENS` (origens autorizadas a incorporar o painel) e `PORT`.
 
 Não há painel web de configuração (decisão de segurança): a configuração é feita por arquivos no deploy.
 
@@ -68,16 +68,17 @@ O banco é um único arquivo SQLite em modo WAL, com três tabelas:
 | Tabela | Conteúdo |
 |---|---|
 | `leituras` | Histórico de status por UF × documento × ambiente (código, motivo, latência, versão, data/hora, erro). |
-| `modelos_dfe` | Modelos de DF-e suportados (extensível por dados; seed inicial `nfe`). |
+| `modelos_dfe` | Modelos de DF-e suportados (extensível por dados; seed inicial `nfe` e `nfce`). |
 | `segredos` | Credenciais e valores sensíveis armazenados de forma criptografada. |
 
 O índice `idx_leituras_lookup` (UF, documento, ambiente, data de coleta) acelera a busca pela última leitura de cada combinação.
 
 ## Proteções das APIs públicas
 
-- **Rate limit por IP.** As rotas `/api/status` e `/api/uf/<uf>/historico` usam um limitador de janela deslizante em memória (padrão 30 requisições por minuto, configurável em `rate_limit.api_requisicoes_por_minuto`). Ao exceder, respondem `429` com `Retry-After: 60`.
+- **Rate limit por IP.** As rotas `/api/status`, `/api/historico` e `/api/uf/<uf>/historico` usam um limitador de janela deslizante em memória (padrão 30 requisições por minuto, configurável em `rate_limit.api_requisicoes_por_minuto`). Ao exceder, respondem `429` com `Retry-After: 60`.
 - **Anti-robô (Cloudflare Turnstile).** Opcional: quando as chaves estão no `.env`, as mesmas rotas exigem o cabeçalho `CF-Turnstile-Token` e validam o token no servidor; ausente ou inválido resulta em `403`.
-- **Cabeçalhos de segurança.** Toda resposta recebe `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options` e `Referrer-Policy`.
+- **CORS liberado.** Toda resposta traz `Access-Control-Allow-Origin: *`, permitindo que o frontend estático seja publicado em outro domínio (Vercel/Pages) consumindo a API normalmente.
+- **Cabeçalhos de segurança.** Toda resposta recebe `Content-Security-Policy`, `X-Frame-Options`, `X-Content-Type-Options` e `Referrer-Policy`. No modo embed (`/?embed=1`), o bloqueio de frame é trocado pela lista de origens `EMBED_ORIGENS`.
 
 ## Ciclo de vida de uma leitura
 

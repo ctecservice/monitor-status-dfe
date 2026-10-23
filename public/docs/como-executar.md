@@ -106,7 +106,7 @@ Acesse `http://127.0.0.1:5628` (a porta é configurável em `config.json`, em `w
 - Painel: `http://127.0.0.1:5628/`
 - Saúde do monitor: `http://127.0.0.1:5628/health` (deve retornar `"scheduler": "ativo"`)
 
-A primeira coleta roda assim que o monitor inicia; as seguintes seguem o intervalo configurado.
+A primeira coleta roda após o primeiro intervalo configurado (padrão: 5 minutos) — o painel mostra "Sem coletas ainda" até lá; as seguintes seguem o mesmo intervalo.
 
 ---
 

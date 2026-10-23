@@ -22,7 +22,7 @@ info:
     name: MIT
     url: https://opensource.org/licenses/MIT
 servers:
-  - url: https://monitor.exemplo.com
+  - url: /
     description: Substitua pelo domínio da sua instalação (porta padrão 5628)
 tags:
   - name: status
@@ -50,9 +50,14 @@ paths:
                 gerado_em: '2026-10-17T13:27:05.481561+00:00'
                 ambientes:
                   - tp_amb: 1
-                    rotulo: Producao
+                    rotulo: Produção
                   - tp_amb: 2
-                    rotulo: Homologacao
+                    rotulo: Homologação
+                modelos:
+                  - codigo: nfe
+                    nome: NF-e
+                  - codigo: nfce
+                    nome: NFC-e
                 celulas:
                   - uf: MG
                     documento: nfe
@@ -65,6 +70,75 @@ paths:
                     response_time: 480
                     coletado_em: '2026-10-17T13:27:05.481561+00:00'
                     erro: null
+        '403':
+          $ref: '#/components/responses/AntibotRecusado'
+        '429':
+          $ref: '#/components/responses/RateLimitExcedido'
+  /api/historico:
+    get:
+      tags: [status]
+      summary: Série histórica de todas as UFs monitoradas
+      description: >
+        Devolve, numa única chamada, as séries históricas de todas as UFs
+        monitoradas para um documento e ambiente. UFs sem leituras na janela
+        aparecem com lista vazia. Ideal para gráficos comparativos.
+      parameters:
+        - name: horas
+          in: query
+          required: false
+          description: "Tamanho da janela em horas (1 a 720). Padrão: 24."
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 720
+            default: 24
+        - name: documento
+          in: query
+          required: false
+          description: "Código do modelo (ex.: nfe). Padrão: primeiro modelo ativo."
+          schema:
+            type: string
+            example: nfe
+        - name: tp_amb
+          in: query
+          required: false
+          description: "Ambiente — 1 (produção) ou 2 (homologação). Padrão: 1."
+          schema:
+            type: integer
+            enum: [1, 2]
+            default: 1
+        - $ref: '#/components/parameters/TurnstileToken'
+      responses:
+        '200':
+          description: Séries por UF e metadados da consulta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HistoricoGeralPayload'
+              example:
+                gerado_em: '2026-10-17T13:27:05.481561+00:00'
+                documento: nfe
+                tp_amb: 1
+                horas: 24
+                ufs: [AC, AL, AP, AM, BA, CE, DF, ES, GO, MA, MT, MS, MG, PA, PB, PR, PE, PI, RJ, RN, RS, RO, RR, SC, SP, SE, TO]
+                series:
+                  MG:
+                    - coletado_em: '2026-10-17T10:00:00+00:00'
+                      cstat: '107'
+                      estado: operacional
+                      cor: '#22C55E'
+                      t_med: 512
+                      response_time: 480
+                      erro: null
+                  SP: []
+        '400':
+          description: Parâmetro inválido (horas, documento ou tp_amb).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Erro'
+              example:
+                erro: "Parâmetro 'tp_amb' deve ser 1 ou 2."
         '403':
           $ref: '#/components/responses/AntibotRecusado'
         '429':
@@ -144,7 +218,7 @@ paths:
                   ver_aplic: null
                   dh_recebto: null
         '400':
-          description: Parâmetro inválido (horas ou tp_amb fora das faixas).
+          description: Parâmetro inválido (horas, documento ou tp_amb fora das faixas).
           content:
             application/json:
               schema:
@@ -247,7 +321,18 @@ components:
           description: 1 = produção, 2 = homologação.
         rotulo:
           type: string
-          example: Producao
+          example: Produção
+    Modelo:
+      type: object
+      properties:
+        codigo:
+          type: string
+          description: "Código interno do modelo (ex.: nfe, nfce)."
+          example: nfe
+        nome:
+          type: string
+          description: Nome exibível do modelo.
+          example: NF-e
     Celula:
       type: object
       properties:
@@ -332,10 +417,40 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Ambiente'
+        modelos:
+          type: array
+          description: Modelos de DFe ativos (ordem da configuração).
+          items:
+            $ref: '#/components/schemas/Modelo'
         celulas:
           type: array
           items:
             $ref: '#/components/schemas/Celula'
+    HistoricoGeralPayload:
+      type: object
+      properties:
+        gerado_em:
+          type: string
+          description: Instante de geração (ISO 8601 UTC).
+        documento:
+          type: string
+        tp_amb:
+          type: integer
+          enum: [1, 2]
+        horas:
+          type: integer
+        ufs:
+          type: array
+          description: Todas as UFs monitoradas, na ordem padrão.
+          items:
+            type: string
+        series:
+          type: object
+          description: Mapa UF → lista de pontos da janela (lista vazia sem dados).
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/Ponto'
     HistoricoPayload:
       type: object
       properties:

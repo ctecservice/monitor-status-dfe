@@ -2,19 +2,23 @@
 <!-- Troque o dominio placeholder pelo dominio real no deploy. -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
-    <loc>https://status.dadosjah.com.br/</loc>
-    <lastmod>2026-10-16</lastmod>
+    <loc>https://monitor-status-dfe.example.com/</loc>
+    <lastmod>2026-10-23</lastmod>
   </url>
   <url>
-    <loc>https://status.dadosjah.com.br/termos</loc>
-    <lastmod>2026-10-16</lastmod>
+    <loc>https://monitor-status-dfe.example.com/faq</loc>
+    <lastmod>2026-10-23</lastmod>
   </url>
   <url>
-    <loc>https://status.dadosjah.com.br/faq</loc>
-    <lastmod>2026-10-16</lastmod>
+    <loc>https://monitor-status-dfe.example.com/termos</loc>
+    <lastmod>2026-10-23</lastmod>
   </url>
   <url>
-    <loc>https://status.dadosjah.com.br/llms.txt</loc>
-    <lastmod>2026-10-16</lastmod>
+    <loc>https://monitor-status-dfe.example.com/api.html</loc>
+    <lastmod>2026-10-23</lastmod>
+  </url>
+  <url>
+    <loc>https://monitor-status-dfe.example.com/llms.txt</loc>
+    <lastmod>2026-10-23</lastmod>
   </url>
 </urlset>

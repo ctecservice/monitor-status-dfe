@@ -90,6 +90,10 @@ def executar_backup():
     destino = pasta / f"statusdfe-{data}.db"
 
     try:
+        # Se o backup do dia já existir (ex.: job re-executado manualmente),
+        # remove o antigo: VACUUM INTO falha quando o destino existe.
+        if destino.exists():
+            destino.unlink()
         with conexao() as conn:
             # VACUUM INTO aceita a expressão parametrizada e gera uma cópia
             # consistente do banco (não pode rodar dentro de uma transação).

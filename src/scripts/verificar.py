@@ -38,6 +38,7 @@ _ROTAS = [
     ("/health", 200),
     ("/termos", 200),
     ("/faq", 200),
+    ("/api/openapi.yaml", 200),
     ("/llms.txt", 200),
     ("/robots.txt", 200),
     ("/sitemap.xml", 200),
@@ -134,9 +135,12 @@ def main():
             falhas += 1
         if not _checagem("Sem JSON inline em /", "__INITIAL_DATA__" not in corpo):
             falhas += 1
+        # Créditos e links públicos vivem nas páginas estáticas.
+        if not _checagem("Página com crédito CTEC", "ctec.com.br" in corpo):
+            falhas += 1
         if not _checagem(
-            "Header com GitHub e CTEC",
-            "github.com/ctecservice/monitor-status-dfe" in corpo and "ctec.com.br" in corpo,
+            "Página com link do GitHub",
+            "github.com/ctecservice/monitor-status-dfe" in corpo,
         ):
             falhas += 1
 
@@ -165,8 +169,25 @@ def main():
         if not _checagem("FAQ com acordeões", corpo.count("<details") >= 10):
             falhas += 1
 
+        # A rota antiga /uf/<uf> redireciona (302) para a página estática
+        # detalhe.html?uf=...&doc=...&amb=...; o urllib segue o redirect.
         _, _, corpo = _requisitar(base, "/uf/MG?documento=nfe&tp_amb=1")
-        if not _checagem("Detalhe sem dados inline", "__DETALHE_DATA__" not in corpo):
+        if not _checagem("Detalhe redireciona para a página estática", 'id="campo-cstat"' in corpo):
+            falhas += 1
+
+        # Verificação explícita do redirect (sem seguir): 302 + Location.
+        import http.client as _http
+        _conn = _http.HTTPConnection("127.0.0.1", porta, timeout=10)
+        _conn.request("GET", "/uf/MG?documento=nfe&tp_amb=1")
+        _resp = _conn.getresponse()
+        _status_redir = _resp.status
+        _location = _resp.getheader("Location", "")
+        _conn.close()
+        if not _checagem(
+            "Redirect /uf/<uf> retorna 302 com Location",
+            _status_redir == 302 and "/detalhe.html?uf=MG" in _location,
+            f"(status={_status_redir}, Location={_location})",
+        ):
             falhas += 1
     finally:
         servidor.shutdown()

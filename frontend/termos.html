@@ -4,21 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Termos de uso — Monitor Status DFe</title>
-  <link rel="icon" href="{{ url_for('static', filename='logos/simbolo.ico') }}">
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  <link rel="icon" href="assets/logos/simbolo.ico">
+  <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <header class="topbar" role="banner">
     <div class="topbar__inner">
-      <a class="topbar__brand" href="{{ url_for('index') }}">
-        <img class="topbar__logo"
-             src="{{ url_for('static', filename='logos/simbolo-400x400.png') }}"
-             alt="" width="28" height="28">
+      <a class="topbar__brand" href="index.html">
+        <img class="topbar__logo" src="assets/logos/simbolo-400x400.png" alt="" width="28" height="28">
         <span>Monitor Status DFe</span>
       </a>
       <nav class="topbar__nav" aria-label="Navegação principal">
-        <a class="topbar__link" href="{{ url_for('index') }}">Painel</a>
-        <a class="topbar__link" href="{{ url_for('faq') }}">FAQ</a>
+        <a class="topbar__link" href="faq.html">FAQ</a>
+        <a class="topbar__link" href="api.html">API</a>
         <a class="topbar__link" href="https://github.com/ctecservice/monitor-status-dfe" target="_blank" rel="noopener">GitHub</a>
       </nav>
     </div>
@@ -26,7 +24,7 @@
 
   <main>
     <article class="prose">
-      <a class="backlink" href="{{ url_for('index') }}">← Voltar ao painel</a>
+      <a class="backlink" href="index.html">← Voltar ao painel</a>
 
       <header class="prose__header">
         <span class="hero__eyebrow">Legal</span>
@@ -133,11 +131,10 @@
       <div class="footer__info">
         <span class="footer__texto">Monitor Status DFe · DadosJah</span>
         <span class="footer__creditos">Projeto open-source (MIT) · Desenvolvido e mantido pela <a class="footer__link" href="https://ctec.com.br/" target="_blank" rel="noopener">CTEC</a></span>
+        <span class="footer__termos"><a class="footer__link" href="termos.html">Termos</a></span>
       </div>
       <a class="footer__logo-link" href="https://dadosjah.com.br" target="_blank" rel="noopener">
-        <img class="footer__logo"
-             src="{{ url_for('static', filename='logos/logo-horizontal-escuro-2400x800.png') }}"
-             alt="DadosJah" height="28">
+        <img class="footer__logo" src="assets/logos/logo-horizontal-escuro-2400x800.png" alt="DadosJah" height="28">
       </a>
     </div>
   </footer>

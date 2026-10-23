@@ -4,7 +4,16 @@ Este documento descreve o uso diário das telas públicas do Monitor Status DFe.
 
 ## Painel principal (`/`)
 
-A página inicial mostra uma grade com as **UFs nas linhas** e os **documentos fiscais nas colunas** (por exemplo, NF-e). Cada célula é um semáforo do estado atual do serviço daquela UF para aquele documento.
+A página inicial mostra o status dos serviços SEFAZ de todas as UFs monitoradas. Há três **visualizações**, alternadas pelo seletor "Visualização" no topo (a escolha fica salva no navegador):
+
+- **Grade** — semáforo com as UFs nas linhas; cada célula mostra o estado atual do serviço.
+- **Cards** — um card por UF com estado, latência e última atualização.
+- **Linha** — gráfico de latência (ms) ao longo do tempo, com uma linha por UF; passe o mouse na legenda para destacar uma UF e clique para fixar o destaque.
+
+Os dados são filtrados por dois seletores:
+
+- **Ambiente** — **Produção** (`tpAmb` 1, ambiente real de emissão) ou **Homologação** (`tpAmb` 2, ambiente de testes).
+- **Modelo** — documento fiscal consultado (por exemplo, **NF-e** ou **NFC-e**).
 
 ### Grade e semáforo
 
@@ -14,7 +23,7 @@ Cada célula exibe:
 - a **latência** medida (em milissegundos), quando disponível;
 - o **código de status** (`cStat`) devolvido pela SEFAZ.
 
-As cores seguem a legenda exibida abaixo do cabeçalho:
+As cores seguem a legenda exibida no cabeçalho da página:
 
 | Estado | Cor | Significado |
 |---|---|---|
@@ -23,16 +32,11 @@ As cores seguem a legenda exibida abaixo do cabeçalho:
 | Indisponível | vermelho | Serviço fora do ar (`cStat` 109) |
 | Sem dados | cinza | A fonte não respondeu (API, rede, certificado ou timeout) |
 
-Clique em qualquer célula para abrir a página de detalhe daquela UF.
+A latência também é colorida por faixa: **até 2 s** verde (normal), **2 a 5 s** amarelo (lenta) e **acima de 5 s** vermelho (crítica).
 
-### Toggle de ambiente
+Clique em qualquer célula (ou card) para abrir a página de detalhe daquela UF.
 
-No topo da grade há um seletor com os ambientes **Produção** e **Homologação**. Ele alterna qual ambiente é exibido:
-
-- **Produção** (`tpAmb` 1) — ambiente real de emissão.
-- **Homologação** (`tpAmb` 2) — ambiente de testes.
-
-A grade é atualizada automaticamente a cada **60 segundos**, buscando os dados mais recentes.
+O painel é atualizado automaticamente a cada **60 segundos**; o botão **Atualizar** (no topo, ao lado dos seletores) recarrega os dados na hora.
 
 ### "Sem dados" × "Indisponível"
 
@@ -41,16 +45,17 @@ A grade é atualizada automaticamente a cada **60 segundos**, buscando os dados 
 - **Sem dados** indica problema entre o monitor e a fonte: a API não respondeu, houve falha de rede, erro de certificado ou timeout. O monitor não conseguiu saber o estado real do serviço.
 - **Indisponível** indica que a fonte respondeu e informou que o **serviço SEFAZ está fora do ar** (`cStat` 109).
 
-## Página de detalhe da UF (`/uf/<uf>`)
+## Página de detalhe da UF (`/detalhe.html?uf=<uf>&doc=<documento>&amb=<ambiente>`)
 
 Ao clicar em uma UF no painel, abre-se a página de detalhe. Ela traz:
 
 - **Último status** — estado, motivo (`xMotivo`), `cStat`, versão da aplicação da SEFAZ, latência, data de recebimento e data da coleta.
-- **Uptime 24 h** — percentual de coletas com estado operacional nas últimas 24 horas.
-- **Latência — últimas 24 h** — gráfico no estilo sparkline em que cada ponto representa uma coleta; passe o mouse sobre os pontos para ver o detalhe.
-- **Documento** — botões para alternar entre os modelos de DF-e disponíveis para aquela UF.
+- **Uptime** — percentual de coletas com estado operacional na janela selecionada.
+- **Latência — histórico** — gráfico de linha com as latências das coletas; a cor dos pontos reflete o estado do serviço; o seletor de janela alterna entre **24 h, 72 h, 7 dias e 30 dias**.
+- **Incidentes recentes** — períodos contínuos em que o serviço esteve indisponível na janela.
+- **Coletas recentes** — as últimas 20 coletas em tabela, com botões para **exportar em CSV ou JSON**.
 
-A página também permite alternar o ambiente (Produção / Homologação) no topo.
+A página também permite alternar o ambiente (Produção / Homologação) e o documento (NF-e / NFC-e) no topo, e tem o botão **Atualizar** para recarregar os dados.
 
 ## Atualização, rate limit e anti-robô
 

@@ -1,0 +1,32 @@
+$kind: http-example
+name: Parâmetro inválido (horas, documento ou tp_amb).
+request:
+  url: "{{baseUrl}}/api/historico?horas=24&documento=nfe&tp_amb=1"
+  method: GET
+  headers:
+    - key: CF-Turnstile-Token
+      value: string
+      disabled: false
+      description: |
+        Token do Cloudflare Turnstile. Exigido APENAS quando a proteção anti-bot está habilitada na instalação; sem chaves configuradas, o cabeçalho é ignorado.
+    - key: Accept
+      value: application/json
+  queryParams:
+    horas: "24"
+    documento: nfe
+    tp_amb: "1"
+  body:
+    type: text
+    content: ""
+response:
+  statusCode: 400
+  statusText: Bad Request
+  headers:
+    Content-Type: application/json
+  body:
+    type: json
+    content: |-
+      {
+        "erro": "Parâmetro 'tp_amb' deve ser 1 ou 2."
+      }
+order: 2000

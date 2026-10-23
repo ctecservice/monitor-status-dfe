@@ -31,7 +31,7 @@ O código-fonte é disponibilizado sob licença de código aberto, que rege espe
 
 ## 5. Dados
 
-O serviço **não coleta dados pessoais de visitantes** e não exige cadastro para consulta. As informações exibidas e armazenadas são dados técnicos públicos de status dos serviços SEFAZ, sem dados pessoais ou fiscais de contribuintes. Credenciais de operadores de instalações próprias permanecem sob responsabilidade de quem opera cada instalação. Registros técnicos de operação (como tentativas de acesso ao painel administrativo) e de proteção anti-robô podem ser mantidos temporariamente em logs locais e são excluídos conforme a retenção configurada.
+O serviço **não coleta dados pessoais de visitantes** e não exige cadastro para consulta. As informações exibidas e armazenadas são dados técnicos públicos de status dos serviços SEFAZ, sem dados pessoais ou fiscais de contribuintes. Credenciais de operadores de instalações próprias permanecem sob responsabilidade de quem opera cada instalação. Registros técnicos de operação (como tentativas de abuso) e de proteção anti-robô podem ser mantidos temporariamente em logs locais e são excluídos conforme a retenção configurada.
 
 ## 6. Alterações
 

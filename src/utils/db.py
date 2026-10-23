@@ -73,7 +73,9 @@ def conexao():
         with conexao() as conn:
             conn.execute(...)
     """
-    conn = sqlite3.connect(caminho_banco())
+    # timeout=5 evita "database is locked" imediato em picos de escrita
+    # concorrente (o WAL já reduz a contenção; o timeout é defensivo).
+    conn = sqlite3.connect(caminho_banco(), timeout=5)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     try:
@@ -89,9 +91,9 @@ def conexao():
 def criar_schema(conn):
     """Cria as tabelas, o índice de busca e ativa o modo WAL.
 
-    Aplica o seed inicial do modelo NF-e com ``INSERT OR IGNORE`` (idempotente)
-    e remove a tabela legada ``configuracoes`` — os valores operacionais agora
-    vivem em ``config.json`` na raiz do projeto.
+    Aplica o seed inicial dos modelos NF-e e NFC-e com ``INSERT OR IGNORE``
+    (idempotente) e remove a tabela legada ``configuracoes`` — os valores
+    operacionais agora vivem em ``config.json`` na raiz do projeto.
 
     Args:
         conn: Conexão sqlite3 aberta (ex.: obtida pela função conexao()).
@@ -113,11 +115,17 @@ def criar_schema(conn):
         conn.execute("ALTER TABLE leituras ADD COLUMN dh_recebto TEXT")
         logger.info("Migração aplicada: coluna leituras.dh_recebto criada.")
 
-    # Seed do modelo NF-e (documento inicial do MVP; novos DFes entram como dados).
+    # Seed dos modelos DF-e iniciais (documentos do MVP; novos entram como dados).
+    # INSERT OR IGNORE mantém a idempotência em bancos já criados.
     conn.execute(
         "INSERT OR IGNORE INTO modelos_dfe (codigo, nome, endpoint, ativo) "
         "VALUES (?, ?, ?, ?)",
         ("nfe", "NF-e", "/v1/nfe/service-status", 1),
+    )
+    conn.execute(
+        "INSERT OR IGNORE INTO modelos_dfe (codigo, nome, endpoint, ativo) "
+        "VALUES (?, ?, ?, ?)",
+        ("nfce", "NFC-e", "/v1/nfce/service-status", 1),
     )
 
     logger.info(

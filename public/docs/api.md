@@ -1,18 +1,23 @@
 # API JSON
 
-O Monitor Status DFe expõe duas APIs JSON públicas, usadas pelo próprio painel e disponíveis para integração, além do endpoint de saúde. Todas as respostas são em UTF-8 e no formato JSON.
+O Monitor Status DFe expõe três APIs JSON públicas, usadas pelo próprio painel e disponíveis para integração, além do endpoint de saúde. Todas as respostas são em UTF-8 e no formato JSON.
 
 ## Endpoints públicos
 
 | Endpoint | Descrição |
 |---|---|
 | `GET /api/status` | Estado atual de todas as células do painel |
+| `GET /api/historico` | Série histórica de todas as UFs monitoradas |
 | `GET /api/uf/<uf>/historico` | Série histórica de uma UF |
 | `GET /health` | Saúde do monitor (sem rate limit nem anti-robô) |
 
+## CORS
+
+As respostas incluem os cabeçalhos `Access-Control-Allow-Origin: *`, `Access-Control-Allow-Headers: CF-Turnstile-Token, Content-Type`, `Access-Control-Allow-Methods: GET, OPTIONS` e `Access-Control-Max-Age: 86400`. Isso permite que um frontend estático hospedado em outro domínio consuma a API. O curinga é aceitável porque a API expõe apenas `GET` público, sem cookies/credenciais, protegido por rate limit e Turnstile opcional.
+
 ## Limite de requisições (rate limit)
 
-As rotas `/api/status` e `/api/uf/<uf>/historico` aplicam um limite por endereço IP, com janela de um minuto. O valor padrão é **30 requisições por minuto** e pode ser ajustado em `config.json`, na chave `rate_limit.api_requisicoes_por_minuto`.
+As rotas `/api/status`, `/api/historico` e `/api/uf/<uf>/historico` aplicam um limite por endereço IP, com janela de um minuto. O valor padrão é **30 requisições por minuto** e pode ser ajustado em `config.json`, na chave `rate_limit.api_requisicoes_por_minuto`.
 
 Ao exceder o limite, a resposta é:
 
@@ -22,7 +27,7 @@ Ao exceder o limite, a resposta é:
 
 ## Proteção anti-robô (Cloudflare Turnstile)
 
-De forma **opcional**, as duas rotas de dados podem exigir uma verificação anti-robô via Cloudflare Turnstile. A proteção é habilitada quando as chaves `TURNSTILE_SITE_KEY` e `TURNSTILE_SECRET_KEY` estão preenchidas no `.env`; sem elas, fica **desligada**.
+De forma **opcional**, as rotas de dados podem exigir uma verificação anti-robô via Cloudflare Turnstile. A proteção é habilitada quando as chaves `TURNSTILE_SITE_KEY` e `TURNSTILE_SECRET_KEY` estão preenchidas no `.env`; sem elas, fica **desligada**.
 
 Quando habilitada, a requisição deve enviar o token do widget no cabeçalho **`CF-Turnstile-Token`**. Se o cabeçalho estiver ausente ou o token for inválido, a resposta é:
 
@@ -62,8 +67,12 @@ GET /api/status
 {
   "gerado_em": "2026-10-16T14:05:00+00:00",
   "ambientes": [
-    { "tp_amb": 1, "rotulo": "Producao" },
-    { "tp_amb": 2, "rotulo": "Homologacao" }
+    { "tp_amb": 1, "rotulo": "Produção" },
+    { "tp_amb": 2, "rotulo": "Homologação" }
+  ],
+  "modelos": [
+    { "codigo": "nfe", "nome": "NF-e" },
+    { "codigo": "nfce", "nome": "NFC-e" }
   ],
   "celulas": [
     {
@@ -89,6 +98,7 @@ GET /api/status
 |---|---|---|
 | `gerado_em` | string (ISO 8601) | Momento em que a resposta foi gerada |
 | `ambientes` | array | Lista de ambientes (`tp_amb` e `rotulo`) |
+| `modelos` | array | Modelos de DFe ativos (`codigo` e `nome`), na ordem da configuração |
 | `celulas` | array | Leitura mais recente por combinação UF × documento × ambiente |
 | `celulas[].uf` | string | Sigla da UF |
 | `celulas[].documento` | string | Código do documento (ex.: `nfe`) |
@@ -103,6 +113,81 @@ GET /api/status
 | `celulas[].erro` | string ou null | Mensagem de erro da coleta, quando houver |
 
 > O painel exibe como latência da célula o `response_time` (tempo real da consulta); quando ele não existe, usa `t_med` como alternativa.
+
+---
+
+## `GET /api/historico`
+
+Devolve, numa única chamada, as séries históricas de **todas as UFs monitoradas** para um documento e ambiente. Ideal para gráficos comparativos e dashboards externos. As UFs sem leituras na janela aparecem com lista vazia.
+
+### Parâmetros de consulta
+
+| Parâmetro | Tipo | Padrão | Descrição |
+|---|---|---|---|
+| `documento` | string | primeiro modelo ativo (ex.: `nfe`) | Código do documento |
+| `tp_amb` | número | `1` | Ambiente (1 = produção, 2 = homologação) |
+| `horas` | número | `24` | Tamanho da janela em horas (1 a 720) |
+
+### Exemplo
+
+```
+GET /api/historico?documento=nfe&tp_amb=1&horas=24
+```
+
+```json
+{
+  "gerado_em": "2026-10-16T14:05:00+00:00",
+  "documento": "nfe",
+  "tp_amb": 1,
+  "horas": 24,
+  "ufs": ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"],
+  "series": {
+    "MG": [
+      {
+        "coletado_em": "2026-10-16T13:00:00+00:00",
+        "cstat": "107",
+        "estado": "operacional",
+        "cor": "#22C55E",
+        "t_med": 1000,
+        "response_time": 672,
+        "erro": null
+      }
+    ],
+    "SP": []
+  }
+}
+```
+
+### Campos
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `gerado_em` | string (ISO 8601) | Momento em que a resposta foi gerada |
+| `documento` | string | Código do documento consultado |
+| `tp_amb` | número | Ambiente consultado |
+| `horas` | número | Janela consultada, em horas |
+| `ufs` | array | Todas as UFs monitoradas, na ordem padrão (inclusive as sem dados) |
+| `series` | objeto | Mapa UF → lista de pontos da janela, ordenados por `coletado_em` |
+| `series.<uf>[]` | array | Pontos da UF; lista vazia quando não há leituras na janela |
+| `series.<uf>[].coletado_em` | string (ISO 8601) | Momento da coleta |
+| `series.<uf>[].cstat` | string ou null | Código de status |
+| `series.<uf>[].estado` | string | Estado do semáforo |
+| `series.<uf>[].cor` | string | Cor hexadecimal do estado |
+| `series.<uf>[].t_med` | número ou null | Tempo médio do serviço informado pela SEFAZ (`TMed`), convertido de segundos para ms |
+| `series.<uf>[].response_time` | número ou null | Tempo de resposta da consulta medido pelo monitor (ms) |
+| `series.<uf>[].erro` | string ou null | Mensagem de erro, quando houver |
+
+### Erros
+
+| Situação | Status HTTP | Corpo |
+|---|---|---|
+| Limite de requisições excedido | 429 | `{ "erro": "Limite de requisições excedido. Tente novamente em instantes." }` (com `Retry-After: 60`) |
+| Anti-robô ausente ou inválido (quando habilitado) | 403 | `{ "erro": "Verificação anti-bot ausente." }` ou `{ "erro": "Verificação anti-bot falhou." }` |
+| `horas` não numérico | 400 | `{ "erro": "Parâmetro 'horas' inválido." }` |
+| `horas` fora de 1–720 | 400 | `{ "erro": "Parâmetro 'horas' deve estar entre 1 e 720." }` |
+| `documento` informado e não ativo | 400 | `{ "erro": "Documento inválido." }` |
+| `tp_amb` não numérico | 400 | `{ "erro": "Parâmetro 'tp_amb' inválido." }` |
+| `tp_amb` fora de 1/2 | 400 | `{ "erro": "Parâmetro 'tp_amb' deve ser 1 ou 2." }` |
 
 ---
 
@@ -196,6 +281,7 @@ GET /api/uf/MG/historico?documento=nfe&tp_amb=1&horas=24
 | UF inválida | 404 | `{ "erro": "UF inválida." }` |
 | `horas` não numérico | 400 | `{ "erro": "Parâmetro 'horas' inválido." }` |
 | `horas` fora de 1–720 | 400 | `{ "erro": "Parâmetro 'horas' deve estar entre 1 e 720." }` |
+| `documento` informado e não ativo | 400 | `{ "erro": "Documento inválido." }` |
 | `tp_amb` não numérico | 400 | `{ "erro": "Parâmetro 'tp_amb' inválido." }` |
 
 ---

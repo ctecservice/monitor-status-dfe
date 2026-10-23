@@ -115,9 +115,12 @@ def executar_ciclo():
     nenhuma consulta é feita e o resumo volta zerado.
 
     Itera sequencialmente modelos ativos × UFs × ambientes e grava uma leitura
-    por consulta. Uma única conexão SQLite é aberta por ciclo e reutilizada
-    (a concorrência do SQLite é limitada; abrir/fechar por leitura seria mais
-    lento e arriscaria contenção de escrita).
+    por consulta, com uma pequena pausa entre consultas
+    (``Settings.DELAY_ENTRE_CONSULTAS_S``, configurável no .env) para respeitar
+    o rate limit global da API DadosJah (10 req/s e 150 req/min). Uma única
+    conexão SQLite é aberta por ciclo e reutilizada (a concorrência do SQLite
+    é limitada; abrir/fechar por leitura seria mais lento e arriscaria
+    contenção de escrita).
 
     Returns:
         dict com ``total``, ``sucessos``, ``falhas`` e ``duracao_s``.
@@ -165,6 +168,10 @@ def executar_ciclo():
                         # descarte (rollback do context manager) as leituras
                         # já coletadas.
                         conn.commit()
+                        # Pausa entre consultas para respeitar o rate limit
+                        # global da API (10 req/s; 150 req/min). Configurável
+                        # no .env via DELAY_ENTRE_CONSULTAS_S.
+                        time.sleep(Settings.DELAY_ENTRE_CONSULTAS_S)
     finally:
         # Logout sempre executado; falha no encerramento não interrompe o job.
         try:

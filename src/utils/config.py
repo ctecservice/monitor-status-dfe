@@ -24,7 +24,7 @@ _PADROES = {
             "AC,AL,AP,AM,BA,CE,DF,ES,GO,MA,MT,MS,MG,PA,PB,PR,PE,PI,RJ,RN,RS,RO,"
             "RR,SC,SP,SE,TO"
         ),
-        "modelos_ativos": "nfe",
+        "modelos_ativos": "nfe,nfce",
         "intervalo_min": 5,
         "timeout_s": 20,
         "motor": "dadosjah",
@@ -216,8 +216,9 @@ def modelos_ativos():
     selecionados = [codigo.lower() for codigo in _lista("coleta", "modelos_ativos")]
     if not selecionados:
         return ativos
-    # Interseção: só devolve o que foi configurado E existe como ativo.
-    return [codigo for codigo in ativos if codigo in selecionados]
+    # Interseção na ordem da configuração (não a ordem alfabética do banco):
+    # o primeiro código é o modelo padrão das rotas e filtros do painel.
+    return [codigo for codigo in selecionados if codigo in ativos]
 
 
 def modelos_ativos_dfe():

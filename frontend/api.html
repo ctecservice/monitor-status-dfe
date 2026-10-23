@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API — Monitor Status DFe</title>
+  <link rel="icon" href="assets/logos/simbolo.ico">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="vendor/swagger-ui/swagger-ui.css">
+</head>
+<body>
+  <header class="topbar" role="banner">
+    <div class="topbar__inner">
+      <a class="topbar__brand" href="index.html">
+        <img class="topbar__logo" src="assets/logos/simbolo-400x400.png" alt="" width="28" height="28">
+        <span>Monitor Status DFe</span>
+      </a>
+      <nav class="topbar__nav" aria-label="Navegação principal">
+        <a class="topbar__link" href="faq.html">FAQ</a>
+        <a class="topbar__link" href="api.html" aria-current="page">API</a>
+        <a class="topbar__link" href="https://github.com/ctecservice/monitor-status-dfe" target="_blank" rel="noopener">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <article class="api-doc">
+      <header class="api-doc__header">
+        <h1 class="api-doc__title">API JSON</h1>
+        <p class="api-doc__lead">
+          API pública do monitor, usada pelo próprio painel e disponível para integração com sistemas externos.
+        </p>
+      </header>
+
+      <section class="api-doc__section">
+        <h2 id="endpoints">Endpoints públicos</h2>
+        <table class="api-doc__table">
+          <thead>
+            <tr>
+              <th>Endpoint</th>
+              <th>Descrição</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>GET /api/status</code></td>
+              <td>Estado atual de todas as células do painel</td>
+            </tr>
+            <tr>
+              <td><code>GET /api/historico</code></td>
+              <td>Série histórica de todas as UFs monitoradas</td>
+            </tr>
+            <tr>
+              <td><code>GET /api/uf/&lt;uf&gt;/historico</code></td>
+              <td>Série histórica de uma UF específica</td>
+            </tr>
+            <tr>
+              <td><code>GET /health</code></td>
+              <td>Saúde do monitor (sem rate limit nem anti-robô)</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="api-doc__section">
+        <h2 id="estados">Estados e cores</h2>
+        <table class="api-doc__table">
+          <thead>
+            <tr>
+              <th>Estado</th>
+              <th>Valor</th>
+              <th>Rótulo</th>
+              <th>Cor</th>
+              <th>Significado (cStat)</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="api-doc__badge" style="background:#22C55E">Operacional</span></td>
+              <td><code>operacional</code></td>
+              <td>Operacional</td>
+              <td><code>#22C55E</code></td>
+              <td>cStat 107</td>
+            </tr>
+            <tr>
+              <td><span class="api-doc__badge" style="background:#F59E0B">Instável</span></td>
+              <td><code>instavel</code></td>
+              <td>Instável</td>
+              <td><code>#F59E0B</code></td>
+              <td>cStat 108</td>
+            </tr>
+            <tr>
+              <td><span class="api-doc__badge" style="background:#EF4444">Indisponível</span></td>
+              <td><code>indisponivel</code></td>
+              <td>Indisponível</td>
+              <td><code>#EF4444</code></td>
+              <td>cStat 109</td>
+            </tr>
+            <tr>
+              <td><span class="api-doc__badge" style="background:#8A8585">Sem dados</span></td>
+              <td><code>sem_dados</code></td>
+              <td>Sem dados</td>
+              <td><code>#8A8585</code></td>
+              <td>Erro de coleta ou timeout</td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <section class="api-doc__section">
+        <h2 id="uso">Como usar</h2>
+        <p>Todas as respostas são em formato JSON com charset UTF-8. Exemplo de chamada:</p>
+        <pre><code>// JavaScript (fetch)
+fetch('/api/status')
+  .then(response => response.json())
+  .then(data => console.log(data));</code></pre>
+
+        <p>Exemplo com <code>curl</code>:</p>
+        <pre><code>curl https://seu-dominio.com/api/status</code></pre>
+
+        <p><strong>Nota:</strong> Quando o frontend está hospedado em domínio diferente da API, configure <code>apiBaseUrl</code> em <code>frontend/js/config.js</code> com a URL completa da API (ex.: <code>https://api.exemplo.com</code>).</p>
+      </section>
+
+      <section class="api-doc__section">
+        <h2 id="rate-limit">Rate limit</h2>
+        <p>As rotas <code>/api/*</code> aplicam limite de <strong>30 requisições por minuto</strong> por endereço IP.</p>
+        <p>Ao exceder o limite, a resposta é:</p>
+        <ul>
+          <li>Status HTTP <code>429</code></li>
+          <li>Header <code>Retry-After: 60</code></li>
+          <li>Corpo: <code>{ "erro": "Limite de requisições excedido. Tente novamente em instantes." }</code></li>
+        </ul>
+        <p>O limite pode ser ajustado em <code>config.json</code>, na chave <code>rate_limit.api_requisicoes_por_minuto</code>.</p>
+      </section>
+
+      <section class="api-doc__section">
+        <h2 id="anti-bot">Anti-bot (Turnstile, opcional)</h2>
+        <p>Quando habilitado, as rotas <code>/api/*</code> exigem o header <code>CF-Turnstile-Token</code> com um token válido do Cloudflare Turnstile.</p>
+        <p>Sem token válido, a resposta é:</p>
+        <ul>
+          <li>Status HTTP <code>403</code></li>
+          <li>Corpo: <code>{ "erro": "Verificação anti-bot ausente." }</code> ou <code>{ "erro": "Verificação anti-bot falhou." }</code></li>
+        </ul>
+        <p>Para habilitar, configure <code>TURNSTILE_SITE_KEY</code> e <code>TURNSTILE_SECRET_KEY</code> no <code>.env</code>.</p>
+      </section>
+
+      <section class="api-doc__section">
+        <h2 id="cors">CORS</h2>
+        <p>A API permite consumo de qualquer origem (CORS liberado):</p>
+        <ul>
+          <li><code>Access-Control-Allow-Origin: *</code></li>
+          <li><code>Access-Control-Allow-Headers: CF-Turnstile-Token, Content-Type</code></li>
+          <li><code>Access-Control-Allow-Methods: GET, OPTIONS</code></li>
+          <li><code>Access-Control-Max-Age: 86400</code></li>
+        </ul>
+        <p>Isso permite que um frontend estático hospedado em outro domínio consuma a API sem restrições.</p>
+      </section>
+
+      <section class="api-doc__section">
+        <h2 id="postman">Coleção Postman</h2>
+        <div class="api-doc__card">
+          <h3>Explorar a API no Postman</h3>
+          <p>Importe a coleção oficial do Monitor Status DFe para testar todos os endpoints diretamente no Postman.</p>
+          <a class="api-doc__btn api-doc__btn--postman" href="https://documenter.getpostman.com/view/53424652/2sBYHUTLTg" target="_blank" rel="noopener">
+            Abrir coleção no Postman
+          </a>
+        </div>
+      </section>
+
+      <section class="api-doc__section">
+        <h2 id="openapi-download">Especificação OpenAPI</h2>
+        <div class="api-doc__card">
+          <h3>Baixar o arquivo da especificação</h3>
+          <p>O arquivo <code>openapi.yaml</code> descreve todos os endpoints, parâmetros e respostas da API — use-o em ferramentas como Swagger Editor, Redoc ou geradores de clientes.</p>
+          <a class="api-doc__btn api-doc__btn--secundario" id="btn-download-openapi" href="/api/openapi.yaml?download=1">
+            Baixar openapi.yaml
+          </a>
+        </div>
+      </section>
+
+      <section class="api-doc__section">
+        <h2 id="swagger">Explorar (Swagger UI)</h2>
+        <p>Documentação interativa gerada a partir da especificação OpenAPI:</p>
+        <div id="swagger-ui" class="api-doc__swagger"></div>
+      </section>
+    </article>
+  </main>
+
+  <footer class="footer" role="contentinfo">
+    <div class="footer__inner">
+      <div class="footer__info">
+        <span class="footer__texto">Monitor Status DFe · DadosJah</span>
+        <span class="footer__creditos">Projeto open-source (MIT) · Desenvolvido e mantido pela <a class="footer__link" href="https://ctec.com.br/" target="_blank" rel="noopener">CTEC</a></span>
+        <span class="footer__termos"><a class="footer__link" href="termos.html">Termos</a></span>
+      </div>
+      <a class="footer__logo-link" href="https://dadosjah.com.br" target="_blank" rel="noopener">
+        <img class="footer__logo" src="assets/logos/logo-horizontal-escuro-2400x800.png" alt="DadosJah" height="28">
+      </a>
+    </div>
+  </footer>
+
+<script src="js/config.js"></script>
+<script src="vendor/swagger-ui/swagger-ui-bundle.js"></script>
+<script src="js/api.js"></script>
+</body>
+</html>
