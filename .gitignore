@@ -28,6 +28,9 @@ config.json
 # Mapa interno do codigo (artefato de processo; nao vai para o repo publico)
 codemap.md
 
+# Ferramenta local de sincronizacao com o repositorio privado (nao versionar)
+sincronizar-interno.bat
+
 # Estado local do Postman CLI e lixeira local do projeto
 .postman/
 trash/
