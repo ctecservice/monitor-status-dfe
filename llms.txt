@@ -82,3 +82,4 @@ Nota: a rota antiga /uf/<uf> ainda existe e redireciona (302) para
 - Arquitetura: public/docs/arquitetura.md
 - Deploy: public/docs/deploy.md
 - Como executar: public/docs/como-executar.md
+- Termos de uso: public/docs/termos-uso.md

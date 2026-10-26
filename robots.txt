@@ -6,3 +6,5 @@ Allow: /
 Allow: /llms.txt
 Allow: /robots.txt
 Disallow: /api/
+Disallow: /health
+# Sitemap: https://SEU-DOMINIO/sitemap.xml (descomente e troque pelo dominio real no deploy)
