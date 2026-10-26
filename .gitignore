@@ -46,6 +46,7 @@ Thumbs.db
 
 # ---- Arquivos relacionados a IA (NAO versionar) ----
 # Obs.: AGENTS.md E versionado de proposito (padrao do projeto).
+AGENTS.md
 CLAUDE.md
 .claude/
 .opencode/
