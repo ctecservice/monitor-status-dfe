@@ -51,7 +51,7 @@ Ao clicar em uma UF no painel, abre-se a página de detalhe. Ela traz:
 
 - **Último status** — estado, motivo (`xMotivo`), `cStat`, versão da aplicação da SEFAZ, latência, data de recebimento e data da coleta.
 - **Uptime** — percentual de coletas com estado operacional na janela selecionada.
-- **Latência — histórico** — gráfico de linha com as latências das coletas; a cor dos pontos reflete o estado do serviço; o seletor de janela alterna entre **24 h, 72 h, 7 dias e 30 dias**.
+- **Latência — histórico** — gráfico de linha com as latências das coletas; a cor dos pontos reflete o estado do serviço; o seletor de janela alterna entre **1 h, 6 h, 24 h, 72 h, 7 dias e 30 dias** (padrão: 1 h).
 - **Incidentes recentes** — períodos contínuos em que o serviço esteve indisponível na janela.
 - **Coletas recentes** — as últimas 20 coletas em tabela, com botões para **exportar em CSV ou JSON**.
 

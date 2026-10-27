@@ -31,6 +31,8 @@
     sem_dados: '#8A8585'
   };
   var JANELAS = {
+    '1h':  { horas: 1, rotulo: '1 h' },
+    '6h':  { horas: 6, rotulo: '6 h' },
     '24h': { horas: 24, rotulo: '24 h' },
     '72h': { horas: 72, rotulo: '72 h' },
     '7d':  { horas: 168, rotulo: '7 dias' },
@@ -265,7 +267,7 @@
     geradoEm: null,
     tpAmb: Number(localStorageGet(STORAGE.tpAmb, '1')) || 1,
     documento: documentoInicial,
-    janela: localStorageGet(STORAGE.janela, '24h'),
+    janela: localStorageGet(STORAGE.janela, '1h'),
     viz: vizInicial,
     embed: false,
     historicoPainel: null,
@@ -614,6 +616,16 @@
     return resultado;
   }
 
+  // Escapa texto para inserção segura no SVG montado como string.
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
   function renderLinha(containerId, series, ufs, horas, opts) {
     opts = opts || {};
     var container = document.getElementById(containerId);
@@ -660,31 +672,20 @@
     function scaleX(t) { return pad.left + (t - minX) / (maxX - minX) * plotW; }
     function scaleY(v) { return pad.top + plotH - (v / maxYRound * plotH); }
 
-    var svgNS = 'http://www.w3.org/2000/svg';
-    var svg = document.createElementNS(svgNS, 'svg');
-    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-    svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-    svg.setAttribute('role', 'img');
-    svg.setAttribute('aria-label', 'Gráfico de latência por UF ao longo do tempo');
-    svg.classList.add('linha-svg');
+    // SVG montado como string única (innerHTML): criar nó a nó com
+    // createElementNS custa tempo por elemento e, com ~300 pontos por UF em
+    // até 27 UFs (~8 mil nós), a renderização travava o navegador.
+    var html = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="xMidYMid meet" ' +
+      'role="img" aria-label="Gráfico de latência por UF ao longo do tempo" class="linha-svg">';
 
     var numLinhasGrade = 5;
     for (var i = 0; i <= numLinhasGrade; i++) {
       var y = pad.top + (plotH / numLinhasGrade) * i;
       var val = maxYRound - (maxYRound / numLinhasGrade) * i;
-      var line = document.createElementNS(svgNS, 'line');
-      line.setAttribute('x1', pad.left);
-      line.setAttribute('x2', W - pad.right);
-      line.setAttribute('y1', y); line.setAttribute('y2', y);
-      line.setAttribute('stroke', '#E2E8F0'); line.setAttribute('stroke-width', '1');
-      svg.appendChild(line);
-      var txt = document.createElementNS(svgNS, 'text');
-      txt.setAttribute('x', pad.left - 10);
-      txt.setAttribute('y', y + 4);
-      txt.setAttribute('text-anchor', 'end');
-      txt.setAttribute('class', 'linha-eixo-y-texto');
-      txt.textContent = val + ' ms';
-      svg.appendChild(txt);
+      html += '<line x1="' + pad.left + '" x2="' + (W - pad.right) + '" y1="' + y + '" y2="' + y +
+        '" stroke="#E2E8F0" stroke-width="1"></line>';
+      html += '<text x="' + (pad.left - 10) + '" y="' + (y + 4) + '" text-anchor="end" class="linha-eixo-y-texto">' +
+        val + ' ms</text>';
     }
 
     var numLabelsX = 6;
@@ -693,17 +694,11 @@
       var x = scaleX(t);
       var date = new Date(t);
       var label = horas <= 24 ? fmtHora(date.toISOString()) : (date.getDate() + '/' + (date.getMonth() + 1));
-      var txtX = document.createElementNS(svgNS, 'text');
-      txtX.setAttribute('x', x);
-      txtX.setAttribute('y', H - pad.bottom + 20);
-      txtX.setAttribute('text-anchor', 'middle');
-      txtX.setAttribute('class', 'linha-eixo-x-texto');
-      txtX.textContent = label;
-      svg.appendChild(txtX);
+      html += '<text x="' + x + '" y="' + (H - pad.bottom + 20) + '" text-anchor="middle" class="linha-eixo-x-texto">' +
+        esc(label) + '</text>';
     }
 
-    var linhasGroup = document.createElementNS(svgNS, 'g');
-    linhasGroup.setAttribute('class', 'linhas-group');
+    html += '<g class="linhas-group">';
 
     var ufIdx = 0;
     var corLinhaDetalhe = opts.corLinha || null;
@@ -723,37 +718,25 @@
         lastValid = { x: xP, y: yP };
       });
       if (pathD) {
-        var path = document.createElementNS(svgNS, 'path');
-        path.setAttribute('d', pathD.trim());
-        path.setAttribute('stroke', corLinha);
-        path.setAttribute('stroke-width', '1.5');
-        path.setAttribute('fill', 'none');
-        path.setAttribute('class', 'linha-uf');
-        path.setAttribute('data-uf', uf);
-        linhasGroup.appendChild(path);
+        html += '<path d="' + esc(pathD.trim()) + '" stroke="' + esc(corLinha) +
+          '" stroke-width="1.5" fill="none" class="linha-uf" data-uf="' + esc(uf) + '"></path>';
       }
       pontos.forEach(function (p) {
         var tP = new Date(p.coletado_em).getTime();
         var lat = latenciaDe(p);
         if (lat === null || p.estado === 'sem_dados') return;
         var xP = scaleX(tP), yP = scaleY(lat);
-        var circle = document.createElementNS(svgNS, 'circle');
-        circle.setAttribute('cx', xP.toFixed(1));
-        circle.setAttribute('cy', yP.toFixed(1));
-        circle.setAttribute('r', '3');
         // No detalhe (corLinhaDetalhe), colore pontos pelo estado; no painel, pela UF
         var corPonto = corLinhaDetalhe ? (COR_ESTADO[p.estado] || COR_ESTADO.sem_dados) : corLinha;
-        circle.setAttribute('fill', corPonto);
-        circle.setAttribute('class', 'linha-ponto');
-        circle.setAttribute('data-uf', uf);
-        var title = document.createElementNS(svgNS, 'title');
-        title.textContent = uf + ' · ' + fmtDatetime(p.coletado_em) + ' · ' + lat + ' ms';
-        circle.appendChild(title);
-        linhasGroup.appendChild(circle);
+        html += '<circle cx="' + xP.toFixed(1) + '" cy="' + yP.toFixed(1) + '" r="3" fill="' + esc(corPonto) +
+          '" class="linha-ponto" data-uf="' + esc(uf) + '"><title>' +
+          esc(uf + ' · ' + fmtDatetime(p.coletado_em) + ' · ' + lat + ' ms') + '</title></circle>';
       });
     });
-    svg.appendChild(linhasGroup);
-    container.appendChild(svg);
+    html += '</g></svg>';
+
+    container.innerHTML = html;
+    var svg = container.querySelector('svg');
 
     // Legenda de UFs (oculta quando há apenas 1 UF no detalhe)
     var showLegenda = ufs.length > 1 && !opts.noLegenda;
